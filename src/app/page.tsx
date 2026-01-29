@@ -643,7 +643,7 @@ export default function Home() {
             <div className="flex items-center gap-2 rounded-full bg-white/70 px-3 py-2 text-xs dark:bg-white/5">
               <span className="text-black dark:text-slate-300">{t.project}</span>
               <select
-                className="rounded-lg border border-slate-200/70 bg-white px-2 py-1 text-xs text-black dark:border-white/10 dark:bg-slate-900/80 dark:text-slate-100"
+                className="rounded-lg border border-slate-200/70 bg-white px-2 py-1 text-xs text-black dark:border-transparent dark:bg-slate-900/60 dark:text-slate-100"
                 value={activeProjectId}
                 onChange={(event) => setActiveProjectId(event.target.value)}
               >
@@ -663,7 +663,7 @@ export default function Home() {
             <div className="flex items-center gap-2 rounded-full bg-white/70 px-3 py-2 text-xs dark:bg-white/5">
               <span className="text-black dark:text-slate-300">{t.board}</span>
               <select
-                className="rounded-lg border border-slate-200/70 bg-white px-2 py-1 text-xs text-black dark:border-white/10 dark:bg-slate-900/80 dark:text-slate-100"
+                className="rounded-lg border border-slate-200/70 bg-white px-2 py-1 text-xs text-black dark:border-transparent dark:bg-slate-900/60 dark:text-slate-100"
                 value={activeBoardId}
                 onChange={(event) => setActiveBoardId(event.target.value)}
               >
@@ -844,7 +844,7 @@ export default function Home() {
                 <label className="grid gap-2">
                   {t.priority}
                   <select
-                    className="rounded-xl border border-white/10 bg-slate-900/80 px-3 py-2 text-slate-100"
+                    className="rounded-xl border border-white/10 bg-white/5 px-3 py-2"
                     value={draft.priority}
                     onChange={(event) =>
                       setDraft({
