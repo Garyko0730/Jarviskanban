@@ -1,36 +1,42 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Jarvis Kanban Panel
 
-## Getting Started
+Jarvis Kanban 是一个轻量的本地看板，用于个人研究/项目管理，支持拖拽、主题切换、数据导入导出与摘要复制。
 
-First, run the development server:
+## 功能特性
+
+- 项目 + 多看板切换
+- 拖拽排序与跨列移动
+- 主题切换（暗色 / 亮色）
+- 中英双语界面
+- 卡片编辑（负责人/优先级/标签/截止日期）
+- **导出 JSON 备份**
+- **导入 JSON 恢复**
+- **复制摘要到剪贴板**（便于日报/周报）
+
+## 开始使用
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+浏览器打开 <http://localhost:3000>。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 数据导入/导出
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **导出**：右上角点击“导出”，会生成 `jarvis-kanban-*.json` 文件。
+- **导入**：点击“导入”选择之前导出的 JSON 文件。
+- **复制摘要**：点击“复制摘要”，会把当前项目/看板摘要写入剪贴板。
 
-## Learn More
+> 导入会覆盖当前状态（项目/看板/主题/语言）。
 
-To learn more about Next.js, take a look at the following resources:
+## 技术栈
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Next.js (App Router)
+- React
+- Tailwind CSS
+- @dnd-kit (拖拽)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 备注
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+该项目是本地使用的个人工具，默认不包含后端/数据库。

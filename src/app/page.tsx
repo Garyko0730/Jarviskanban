@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
+  DragEndEvent,
   DragOverlay,
   PointerSensor,
   closestCorners,
@@ -29,6 +30,12 @@ const i18n = {
     light: "亮色",
     dark: "暗色",
     language: "语言",
+    exportData: "导出",
+    importData: "导入",
+    copySummary: "复制摘要",
+    exportSuccess: "已导出看板数据",
+    importFailed: "导入失败，请检查文件格式",
+    copySuccess: "已复制到剪贴板",
     todo: "待办",
     inProgress: "进行中",
     review: "评审",
@@ -59,6 +66,12 @@ const i18n = {
     light: "Light",
     dark: "Dark",
     language: "Language",
+    exportData: "Export",
+    importData: "Import",
+    copySummary: "Copy Summary",
+    exportSuccess: "Board data exported",
+    importFailed: "Import failed. Check the file format",
+    copySuccess: "Copied to clipboard",
     todo: "To Do",
     inProgress: "In Progress",
     review: "Review",
@@ -289,6 +302,8 @@ export default function Home() {
   const [activeBoardId, setActiveBoardId] = useState("board-1");
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const t = i18n[lang];
 
@@ -368,7 +383,83 @@ export default function Home() {
     );
   };
 
-  const handleDragEnd = ({ active, over }: { active: any; over: any }) => {
+  const pushNotice = (message: string) => {
+    setNotice(message);
+    window.setTimeout(() => setNotice(null), 2200);
+  };
+
+  const exportData = () => {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      theme,
+      lang,
+      projects,
+      activeProjectId,
+      activeBoardId,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `jarvis-kanban-${Date.now()}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    pushNotice(t.exportSuccess);
+  };
+
+  const importData = async (file: File) => {
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text) as {
+        projects?: Project[];
+        activeProjectId?: string;
+        activeBoardId?: string;
+        theme?: "dark" | "light";
+        lang?: Lang;
+      };
+      if (!parsed.projects || parsed.projects.length === 0) {
+        throw new Error("invalid");
+      }
+      setProjects(parsed.projects);
+      if (parsed.activeProjectId) setActiveProjectId(parsed.activeProjectId);
+      if (parsed.activeBoardId) setActiveBoardId(parsed.activeBoardId);
+      if (parsed.theme) setTheme(parsed.theme);
+      if (parsed.lang) setLang(parsed.lang);
+    } catch {
+      pushNotice(t.importFailed);
+    }
+  };
+
+  const copySummary = async () => {
+    const lines = [
+      `# ${activeProject.name} / ${activeBoard.name}`,
+      ...activeBoard.columns.map((column) => {
+        const tasks = column.taskIds
+          .map((id) => activeBoard.tasks[id])
+          .filter((task): task is Task => Boolean(task));
+        const taskLines =
+          tasks.length === 0
+            ? `- ${t.empty}`
+            : tasks
+                .map((task) =>
+                  `- ${task.title}${task.assignee ? ` (@${task.assignee})` : ""}`
+                )
+                .join("\n");
+        return `## ${column.title}\n${taskLines}`;
+      }),
+    ];
+    const text = lines.join("\n\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      pushNotice(t.copySuccess);
+    } catch {
+      window.alert(text);
+    }
+  };
+
+  const handleDragEnd = ({ active, over }: DragEndEvent) => {
     if (!over) return;
     const activeId = String(active.id);
     const overId = String(over.id);
@@ -513,6 +604,17 @@ export default function Home() {
           theme === "dark" ? "glass" : "light-glass"
         } rounded-3xl px-6 py-4 shadow-2xl shadow-slate-950/20`}
       >
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) void importData(file);
+            event.currentTarget.value = "";
+          }}
+        />
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-cyan-500/80">
@@ -521,6 +623,9 @@ export default function Home() {
             <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
               {t.appName}
             </h1>
+            {notice && (
+              <p className="mt-2 text-xs text-emerald-500">{notice}</p>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2 rounded-full bg-white/70 px-3 py-2 text-xs dark:bg-white/5">
@@ -564,6 +669,26 @@ export default function Home() {
               </button>
             </div>
             <div className="flex items-center gap-2 rounded-full bg-white/70 px-3 py-2 text-xs dark:bg-white/5">
+              <button
+                onClick={exportData}
+                className="rounded-full border border-cyan-500/40 px-3 py-1 text-[10px] text-cyan-600 hover:bg-cyan-500/10 dark:text-cyan-200"
+              >
+                {t.exportData}
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="rounded-full border border-indigo-400/40 px-3 py-1 text-[10px] text-indigo-600 hover:bg-indigo-500/10 dark:text-indigo-200"
+              >
+                {t.importData}
+              </button>
+              <button
+                onClick={copySummary}
+                className="rounded-full border border-emerald-400/40 px-3 py-1 text-[10px] text-emerald-600 hover:bg-emerald-500/10 dark:text-emerald-200"
+              >
+                {t.copySummary}
+              </button>
+            </div>
+            <div className="flex items-center gap-2 rounded-full bg-white/70 px-3 py-2 text-xs dark:bg-white/5">
               <span className="text-slate-600 dark:text-slate-300">{t.language}</span>
               <button
                 onClick={() => setLang(lang === "zh" ? "en" : "zh")}
@@ -594,7 +719,9 @@ export default function Home() {
           onDragCancel={() => setActiveTaskId(null)}
         >
           {activeBoard.columns.map((column) => {
-            const tasks = column.taskIds.map((id) => activeBoard.tasks[id]);
+            const tasks = column.taskIds
+              .map((id) => activeBoard.tasks[id])
+              .filter((task): task is Task => Boolean(task));
             return (
               <div
                 key={column.id}
