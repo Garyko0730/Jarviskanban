@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
+  DragEndEvent,
   DragOverlay,
   PointerSensor,
   closestCorners,
@@ -426,7 +427,7 @@ export default function Home() {
       if (parsed.activeBoardId) setActiveBoardId(parsed.activeBoardId);
       if (parsed.theme) setTheme(parsed.theme);
       if (parsed.lang) setLang(parsed.lang);
-    } catch (error) {
+    } catch {
       pushNotice(t.importFailed);
     }
   };
@@ -453,12 +454,12 @@ export default function Home() {
     try {
       await navigator.clipboard.writeText(text);
       pushNotice(t.copySuccess);
-    } catch (error) {
+    } catch {
       window.alert(text);
     }
   };
 
-  const handleDragEnd = ({ active, over }: { active: any; over: any }) => {
+  const handleDragEnd = ({ active, over }: DragEndEvent) => {
     if (!over) return;
     const activeId = String(active.id);
     const overId = String(over.id);
