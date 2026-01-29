@@ -94,6 +94,8 @@ const i18n = {
   },
 } as const;
 
+const assignees = ["Jarvis", "Ko先生"] as const;
+
 type Lang = keyof typeof i18n;
 
 type Task = {
@@ -140,7 +142,7 @@ const defaultBoard = (lang: Lang): Board => {
     id: "task-2",
     title: "看板UI交互验证",
     description: "确认拖拽与主题切换的体验",
-    assignee: "Ko先生",
+    assignee: "Jarvis",
     priority: "medium",
     tags: ["Product"],
     dueDate: "",
@@ -229,10 +231,10 @@ function TaskCard({
 
   const priorityColor =
     task.priority === "high"
-      ? "text-rose-300 bg-rose-500/10 border-rose-400/30"
+      ? "text-rose-600 bg-rose-100 border-rose-200 dark:text-rose-300 dark:bg-rose-500/10 dark:border-rose-400/30"
       : task.priority === "medium"
-      ? "text-amber-300 bg-amber-500/10 border-amber-400/30"
-      : "text-emerald-300 bg-emerald-500/10 border-emerald-400/30";
+      ? "text-amber-600 bg-amber-100 border-amber-200 dark:text-amber-300 dark:bg-amber-500/10 dark:border-amber-400/30"
+      : "text-emerald-600 bg-emerald-100 border-emerald-200 dark:text-emerald-300 dark:bg-emerald-500/10 dark:border-emerald-400/30";
 
   return (
     <div
@@ -240,23 +242,25 @@ function TaskCard({
       style={style}
       {...attributes}
       {...listeners}
-      className={`cursor-grab rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-900 shadow-lg shadow-slate-200/60 transition active:cursor-grabbing dark:border-white/10 dark:bg-slate-900/60 dark:text-slate-100 dark:shadow-slate-950/30 ${
+      className={`cursor-grab rounded-xl border border-slate-200 bg-white p-3 text-sm text-black shadow-lg shadow-slate-200/60 transition active:cursor-grabbing dark:border-white/10 dark:bg-slate-900/60 dark:text-slate-100 dark:shadow-slate-950/30 ${
         isDragging ? "opacity-60" : "opacity-100"
       }`}
       onClick={onClick}
     >
       <div className="flex items-center justify-between gap-2">
-        <h4 className="text-sm font-semibold text-slate-100">{task.title}</h4>
+        <h4 className="text-sm font-semibold text-black dark:text-slate-100">
+          {task.title}
+        </h4>
         <span
           className={`rounded-full border px-2 py-0.5 text-[10px] uppercase ${priorityColor}`}
         >
           {task.priority}
         </span>
       </div>
-      <p className="mt-2 text-xs text-slate-600 line-clamp-2 dark:text-slate-300">
+      <p className="mt-2 text-xs text-black line-clamp-2 dark:text-slate-300">
         {task.description}
       </p>
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400">
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-[10px] text-black dark:text-slate-400">
         {task.assignee && (
           <span className="rounded-full bg-slate-100 px-2 py-0.5 dark:bg-white/10">
             {task.assignee}
@@ -303,11 +307,13 @@ export default function Home() {
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const t = i18n[lang];
 
   useEffect(() => {
+    setMounted(true);
     const saved = localStorage.getItem(storageKey);
     const savedLang = localStorage.getItem(langKey) as Lang | null;
     const savedTheme = localStorage.getItem(themeKey) as "dark" | "light" | null;
@@ -327,6 +333,7 @@ export default function Home() {
 
   useEffect(() => {
     localStorage.setItem(themeKey, theme);
+    document.documentElement.style.colorScheme = theme;
     if (theme === "dark") {
       document.documentElement.classList.add("dark");
     } else {
@@ -476,6 +483,10 @@ export default function Home() {
       const source = columns.find((col) => col.id === sourceColumn.id)!;
       const target = columns.find((col) => col.id === targetColumn.id)!;
 
+      if (source.id === target.id && overId === source.id) {
+        return { ...board, columns };
+      }
+
       if (source.id === target.id) {
         const oldIndex = source.taskIds.indexOf(activeId);
         const newIndex = source.taskIds.indexOf(overId);
@@ -484,6 +495,7 @@ export default function Home() {
         }
       } else {
         source.taskIds = source.taskIds.filter((id) => id !== activeId);
+        target.taskIds = target.taskIds.filter((id) => id !== activeId);
         const insertIndex = target.taskIds.indexOf(overId);
         if (insertIndex >= 0) {
           target.taskIds.splice(insertIndex, 0, activeId);
@@ -503,7 +515,7 @@ export default function Home() {
       columnId,
       title: task?.title ?? "",
       description: task?.description ?? "",
-      assignee: task?.assignee ?? "",
+      assignee: task?.assignee ?? assignees[0] ?? "",
       priority: task?.priority ?? "medium",
       tags: task?.tags.join(",") ?? "",
       dueDate: task?.dueDate ?? "",
@@ -596,7 +608,7 @@ export default function Home() {
   return (
     <div
       className={`min-h-screen grid-bg px-6 py-6 ${
-        theme === "dark" ? "text-slate-100" : "text-slate-900"
+        theme === "dark" ? "text-slate-100" : "text-black"
       }`}
     >
       <header
@@ -620,7 +632,7 @@ export default function Home() {
             <p className="text-xs uppercase tracking-[0.3em] text-cyan-500/80">
               AI Ops
             </p>
-            <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+            <h1 className="text-2xl font-semibold text-black drop-shadow-[0_1px_0_rgba(255,255,255,0.6)] dark:text-slate-100">
               {t.appName}
             </h1>
             {notice && (
@@ -629,9 +641,9 @@ export default function Home() {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2 rounded-full bg-white/70 px-3 py-2 text-xs dark:bg-white/5">
-              <span className="text-slate-600 dark:text-slate-300">{t.project}</span>
+              <span className="text-black dark:text-slate-300">{t.project}</span>
               <select
-                className="rounded-lg bg-white px-2 py-1 text-xs text-slate-900 dark:bg-slate-900/60 dark:text-slate-100"
+                className="rounded-lg border border-slate-200/70 bg-white px-2 py-1 text-xs text-black dark:border-white/10 dark:bg-slate-900/80 dark:text-slate-100"
                 value={activeProjectId}
                 onChange={(event) => setActiveProjectId(event.target.value)}
               >
@@ -649,9 +661,9 @@ export default function Home() {
               </button>
             </div>
             <div className="flex items-center gap-2 rounded-full bg-white/70 px-3 py-2 text-xs dark:bg-white/5">
-              <span className="text-slate-600 dark:text-slate-300">{t.board}</span>
+              <span className="text-black dark:text-slate-300">{t.board}</span>
               <select
-                className="rounded-lg bg-white px-2 py-1 text-xs text-slate-900 dark:bg-slate-900/60 dark:text-slate-100"
+                className="rounded-lg border border-slate-200/70 bg-white px-2 py-1 text-xs text-black dark:border-white/10 dark:bg-slate-900/80 dark:text-slate-100"
                 value={activeBoardId}
                 onChange={(event) => setActiveBoardId(event.target.value)}
               >
@@ -689,7 +701,7 @@ export default function Home() {
               </button>
             </div>
             <div className="flex items-center gap-2 rounded-full bg-white/70 px-3 py-2 text-xs dark:bg-white/5">
-              <span className="text-slate-600 dark:text-slate-300">{t.language}</span>
+              <span className="text-black dark:text-slate-300">{t.language}</span>
               <button
                 onClick={() => setLang(lang === "zh" ? "en" : "zh")}
                 className="rounded-full border border-indigo-400/40 px-3 py-1 text-[10px] uppercase text-indigo-600 dark:text-indigo-200"
@@ -698,7 +710,7 @@ export default function Home() {
               </button>
             </div>
             <div className="flex items-center gap-2 rounded-full bg-white/70 px-3 py-2 text-xs dark:bg-white/5">
-              <span className="text-slate-600 dark:text-slate-300">{t.theme}</span>
+              <span className="text-black dark:text-slate-300">{t.theme}</span>
               <button
                 onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
                 className="rounded-full border border-emerald-400/40 px-3 py-1 text-[10px] uppercase text-emerald-600 dark:text-emerald-200"
@@ -711,65 +723,67 @@ export default function Home() {
       </header>
 
       <section className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-4">
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCorners}
-          onDragEnd={handleDragEnd}
-          onDragStart={({ active }) => setActiveTaskId(String(active.id))}
-          onDragCancel={() => setActiveTaskId(null)}
-        >
-          {activeBoard.columns.map((column) => {
-            const tasks = column.taskIds
-              .map((id) => activeBoard.tasks[id])
-              .filter((task): task is Task => Boolean(task));
-            return (
-              <div
-                key={column.id}
-                className="flex flex-col gap-3 rounded-3xl border border-slate-200 bg-white/70 p-4 shadow-lg dark:border-white/10 dark:bg-slate-950/50"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                      {column.title}
-                    </h2>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                      {tasks.length} items
-                    </p>
+        {mounted ? (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCorners}
+            onDragEnd={handleDragEnd}
+            onDragStart={({ active }) => setActiveTaskId(String(active.id))}
+            onDragCancel={() => setActiveTaskId(null)}
+          >
+            {activeBoard.columns.map((column) => {
+              const tasks = column.taskIds
+                .map((id) => activeBoard.tasks[id])
+                .filter((task): task is Task => Boolean(task));
+              return (
+                <div
+                  key={column.id}
+                  className="flex flex-col gap-3 rounded-3xl border border-slate-200 bg-white/70 p-4 shadow-lg dark:border-white/10 dark:bg-slate-950/50"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-sm font-semibold text-black dark:text-slate-100">
+                        {column.title}
+                      </h2>
+                      <p className="text-[10px] text-black dark:text-slate-400">
+                        {tasks.length} items
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => openDraft(column.id)}
+                      className="rounded-full border border-cyan-400/40 px-3 py-1 text-[10px] text-cyan-600 hover:bg-cyan-500/10 dark:text-cyan-200"
+                    >
+                      + {t.addCard}
+                    </button>
                   </div>
-                  <button
-                    onClick={() => openDraft(column.id)}
-                    className="rounded-full border border-cyan-400/40 px-3 py-1 text-[10px] text-cyan-600 hover:bg-cyan-500/10 dark:text-cyan-200"
-                  >
-                    + {t.addCard}
-                  </button>
-                </div>
 
-                <ColumnDroppable id={column.id}>
-                  <SortableContext
-                    items={column.taskIds}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    {tasks.length === 0 && (
-                      <div className="rounded-lg border border-dashed border-slate-200 py-4 text-center text-xs text-slate-400 dark:border-white/10">
-                        {t.empty}
-                      </div>
-                    )}
-                    {tasks.map((task) => (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        onClick={() => openDraft(column.id, task)}
-                      />
-                    ))}
-                  </SortableContext>
-                </ColumnDroppable>
-              </div>
-            );
-          })}
-          <DragOverlay>
-            <OverlayCard task={activeTaskId ? activeBoard.tasks[activeTaskId] : undefined} />
-          </DragOverlay>
-        </DndContext>
+                  <ColumnDroppable id={column.id}>
+                    <SortableContext
+                      items={column.taskIds}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {tasks.length === 0 && (
+                        <div className="rounded-lg border border-dashed border-slate-200 py-4 text-center text-xs text-slate-400 dark:border-white/10">
+                          {t.empty}
+                        </div>
+                      )}
+                      {tasks.map((task) => (
+                        <TaskCard
+                          key={task.id}
+                          task={task}
+                          onClick={() => openDraft(column.id, task)}
+                        />
+                      ))}
+                    </SortableContext>
+                  </ColumnDroppable>
+                </div>
+              );
+            })}
+            <DragOverlay>
+              <OverlayCard task={activeTaskId ? activeBoard.tasks[activeTaskId] : undefined} />
+            </DragOverlay>
+          </DndContext>
+        ) : null}
       </section>
 
       {draft && (
@@ -810,18 +824,27 @@ export default function Home() {
               <div className="grid grid-cols-2 gap-3">
                 <label className="grid gap-2">
                   {t.assignee}
-                  <input
-                    className="rounded-xl border border-white/10 bg-white/5 px-3 py-2"
-                    value={draft.assignee}
-                    onChange={(event) =>
-                      setDraft({ ...draft, assignee: event.target.value })
-                    }
-                  />
+                  <div className="flex flex-wrap gap-2">
+                    {assignees.map((name) => (
+                      <button
+                        key={name}
+                        type="button"
+                        onClick={() => setDraft({ ...draft, assignee: name })}
+                        className={`rounded-full border px-3 py-1 text-[10px] transition ${
+                          draft.assignee === name
+                            ? "border-cyan-400/60 bg-cyan-500/20 text-cyan-200"
+                            : "border-white/10 bg-white/5 text-slate-300 hover:border-cyan-400/40"
+                        }`}
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
                 </label>
                 <label className="grid gap-2">
                   {t.priority}
                   <select
-                    className="rounded-xl border border-white/10 bg-white/5 px-3 py-2"
+                    className="rounded-xl border border-white/10 bg-slate-900/80 px-3 py-2 text-slate-100"
                     value={draft.priority}
                     onChange={(event) =>
                       setDraft({

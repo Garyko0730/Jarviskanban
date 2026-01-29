@@ -37,6 +37,16 @@ npm run dev
 - Tailwind CSS
 - @dnd-kit (拖拽)
 
+## 截图
+
+### 亮色主题
+
+![Jarvis Kanban Light](./docs/kanban-light.png)
+
+### 暗色主题
+
+![Jarvis Kanban Dark](./docs/kanban-dark.png)
+
 ## 备注
 
 该项目是本地使用的个人工具，默认不包含后端/数据库。
