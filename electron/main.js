@@ -13,6 +13,7 @@ const userDataPath = app.getPath("userData");
 const syncConfigPath = path.join(userDataPath, "sync.json");
 
 const getAppRoot = () => app.getAppPath();
+const getWorkDir = () => (app.isPackaged ? process.resourcesPath : getAppRoot());
 
 const getUnpackedPath = (relativePath) =>
   app.isPackaged
@@ -86,7 +87,7 @@ const startSyncAgent = (syncFile) => {
   syncAgent = spawnSafe(
     electronBin,
     ["--run-as-node", scriptPath, "--file", syncFile],
-    { stdio: "ignore", cwd: getAppRoot() }
+    { stdio: "ignore", cwd: getWorkDir() }
   );
 };
 
@@ -145,7 +146,7 @@ const startNextServer = async () => {
   nextProcess = spawnSafe(
     electronBin,
     ["--run-as-node", nextBin, "start", "-p", String(currentPort)],
-    { stdio: "ignore", cwd: getAppRoot() }
+    { stdio: "ignore", cwd: getWorkDir() }
   );
   await waitForServer(`http://localhost:${currentPort}`);
 };
