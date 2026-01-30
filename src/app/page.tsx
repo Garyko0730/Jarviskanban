@@ -46,6 +46,9 @@ const i18n = {
     syncNow: "立即同步",
     disconnect: "断开",
     copySyncPath: "复制同步路径",
+    autoSync: "自动同步",
+    autoOn: "开启",
+    autoOff: "关闭",
     syncFile: "同步文件",
     lastSync: "最后同步",
     notConnected: "未连接",
@@ -104,6 +107,9 @@ const i18n = {
     syncNow: "Sync Now",
     disconnect: "Disconnect",
     copySyncPath: "Copy Sync Path",
+    autoSync: "Auto Sync",
+    autoOn: "On",
+    autoOff: "Off",
     syncFile: "Sync File",
     lastSync: "Last Sync",
     notConnected: "Not connected",
@@ -219,6 +225,7 @@ const storageKey = "jarvis-kanban-state";
 const themeKey = "jarvis-kanban-theme";
 const langKey = "jarvis-kanban-lang";
 const focusKey = "jarvis-kanban-focus";
+const autoSyncKey = "jarvis-kanban-auto-sync";
 
 const getId = () =>
   globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random()}`;
@@ -386,6 +393,7 @@ export default function Home() {
   const [syncFileName, setSyncFileName] = useState<string | null>(null);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const [syncSupported, setSyncSupported] = useState(false);
+  const [autoSync, setAutoSync] = useState(true);
   const syncTimerRef = useRef<number | null>(null);
 
   const t = i18n[lang];
@@ -398,9 +406,11 @@ export default function Home() {
     const savedLang = localStorage.getItem(langKey) as Lang | null;
     const savedTheme = localStorage.getItem(themeKey) as "dark" | "light" | null;
     const savedFocus = localStorage.getItem(focusKey);
+    const savedAutoSync = localStorage.getItem(autoSyncKey);
     if (savedLang) setLang(savedLang);
     if (savedTheme) setTheme(savedTheme);
     if (savedFocus) setFocusMode(savedFocus === "on");
+    if (savedAutoSync) setAutoSync(savedAutoSync === "on");
     if (saved) {
       const parsed = JSON.parse(saved) as {
         projects: Project[];
@@ -442,6 +452,10 @@ export default function Home() {
   useEffect(() => {
     localStorage.setItem(focusKey, focusMode ? "on" : "off");
   }, [focusMode]);
+
+  useEffect(() => {
+    localStorage.setItem(autoSyncKey, autoSync ? "on" : "off");
+  }, [autoSync]);
 
   useEffect(() => {
     localStorage.setItem(
@@ -594,7 +608,7 @@ export default function Home() {
   };
 
   useEffect(() => {
-    if (!mounted || !syncSupported || !syncHandle) return;
+    if (!mounted || !syncSupported || !syncHandle || !autoSync) return;
     if (syncTimerRef.current) window.clearTimeout(syncTimerRef.current);
     syncTimerRef.current = window.setTimeout(() => {
       void writeSyncFile();
@@ -611,6 +625,7 @@ export default function Home() {
     syncHandle,
     syncSupported,
     mounted,
+    autoSync,
   ]);
 
   const connectSyncFile = async () => {
@@ -970,6 +985,13 @@ export default function Home() {
                   className="rounded-full border border-cyan-500/40 px-3 py-1 text-[10px] text-cyan-600 hover:bg-cyan-500/10 disabled:cursor-not-allowed disabled:opacity-60 dark:text-cyan-200"
                 >
                   {t.connectFile}
+                </button>
+                <button
+                  onClick={() => setAutoSync((prev) => !prev)}
+                  disabled={!isFsAvailable || !isSyncConnected}
+                  className="rounded-full border border-amber-400/40 px-3 py-1 text-[10px] text-amber-600 hover:bg-amber-500/10 disabled:cursor-not-allowed disabled:opacity-60 dark:text-amber-200"
+                >
+                  {t.autoSync} {autoSync ? t.autoOn : t.autoOff}
                 </button>
                 <button
                   onClick={() => void writeSyncFile(true)}
