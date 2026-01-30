@@ -33,6 +33,28 @@ const i18n = {
     exportData: "导出",
     importData: "导入",
     copySummary: "复制摘要",
+    quickAdd: "快速添加",
+    quickTitle: "任务标题",
+    addTask: "添加",
+    focusMode: "专注模式",
+    focusOn: "开启",
+    focusOff: "关闭",
+    wipLimit: "WIP 上限",
+    wipOver: "超出",
+    syncBridge: "同步桥",
+    connectFile: "连接文件",
+    syncNow: "立即同步",
+    disconnect: "断开",
+    copySyncPath: "复制同步路径",
+    syncFile: "同步文件",
+    lastSync: "最后同步",
+    notConnected: "未连接",
+    syncUnavailable: "当前浏览器不支持 File System Access API",
+    syncSuccess: "同步完成",
+    syncFailed: "同步失败",
+    syncPathCopied: "同步路径已复制",
+    syncPathUnavailable: "无法获取路径",
+    syncNever: "尚未同步",
     exportSuccess: "已导出看板数据",
     importFailed: "导入失败，请检查文件格式",
     copySuccess: "已复制到剪贴板",
@@ -69,6 +91,28 @@ const i18n = {
     exportData: "Export",
     importData: "Import",
     copySummary: "Copy Summary",
+    quickAdd: "Quick Add",
+    quickTitle: "Task title",
+    addTask: "Add",
+    focusMode: "Focus Mode",
+    focusOn: "On",
+    focusOff: "Off",
+    wipLimit: "WIP Limit",
+    wipOver: "Over",
+    syncBridge: "Sync Bridge",
+    connectFile: "Connect File",
+    syncNow: "Sync Now",
+    disconnect: "Disconnect",
+    copySyncPath: "Copy Sync Path",
+    syncFile: "Sync File",
+    lastSync: "Last Sync",
+    notConnected: "Not connected",
+    syncUnavailable: "File System Access API is not available in this browser",
+    syncSuccess: "Sync complete",
+    syncFailed: "Sync failed",
+    syncPathCopied: "Sync path copied",
+    syncPathUnavailable: "Sync path unavailable",
+    syncNever: "Never",
     exportSuccess: "Board data exported",
     importFailed: "Import failed. Check the file format",
     copySuccess: "Copied to clipboard",
@@ -112,6 +156,7 @@ type Column = {
   id: string;
   title: string;
   taskIds: string[];
+  wipLimit?: number;
 };
 
 type Board = {
@@ -152,9 +197,9 @@ const defaultBoard = (lang: Lang): Board => {
     id: "board-1",
     name: "Research Sprint",
     columns: [
-      { id: "col-todo", title: t.todo, taskIds: [task1.id] },
-      { id: "col-progress", title: t.inProgress, taskIds: [task2.id] },
-      { id: "col-review", title: t.review, taskIds: [] },
+      { id: "col-todo", title: t.todo, taskIds: [task1.id], wipLimit: 3 },
+      { id: "col-progress", title: t.inProgress, taskIds: [task2.id], wipLimit: 3 },
+      { id: "col-review", title: t.review, taskIds: [], wipLimit: 3 },
       { id: "col-done", title: t.done, taskIds: [] },
     ],
     tasks: {
@@ -173,6 +218,7 @@ const defaultProject = (lang: Lang): Project => ({
 const storageKey = "jarvis-kanban-state";
 const themeKey = "jarvis-kanban-theme";
 const langKey = "jarvis-kanban-lang";
+const focusKey = "jarvis-kanban-focus";
 
 const getId = () =>
   globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random()}`;
@@ -186,6 +232,27 @@ type Draft = {
   priority: "low" | "medium" | "high";
   tags: string;
   dueDate: string;
+};
+
+type SyncFileHandle = {
+  name?: string;
+  createWritable: () => Promise<{
+    write: (data: string) => Promise<void>;
+    close: () => Promise<void>;
+  }>;
+};
+
+type SyncFilePickerOptions = {
+  suggestedName?: string;
+  types?: Array<{
+    description?: string;
+    accept: Record<string, string[]>;
+  }>;
+};
+
+type SyncOpenFilePickerOptions = {
+  multiple?: boolean;
+  types?: SyncFilePickerOptions["types"];
 };
 
 function ColumnDroppable({
@@ -308,17 +375,32 @@ export default function Home() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
+  const [quickTitle, setQuickTitle] = useState("");
+  const [quickAssignee, setQuickAssignee] = useState(assignees[0]);
+  const [quickPriority, setQuickPriority] = useState<Task["priority"]>("medium");
+  const [wipEditColumnId, setWipEditColumnId] = useState<string | null>(null);
+  const [wipDraft, setWipDraft] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [syncHandle, setSyncHandle] = useState<SyncFileHandle | null>(null);
+  const [syncFileName, setSyncFileName] = useState<string | null>(null);
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const [syncSupported, setSyncSupported] = useState(false);
+  const syncTimerRef = useRef<number | null>(null);
 
   const t = i18n[lang];
+  const isFsAvailable = syncSupported;
+  const isSyncConnected = Boolean(syncHandle);
 
   useEffect(() => {
     setMounted(true);
     const saved = localStorage.getItem(storageKey);
     const savedLang = localStorage.getItem(langKey) as Lang | null;
     const savedTheme = localStorage.getItem(themeKey) as "dark" | "light" | null;
+    const savedFocus = localStorage.getItem(focusKey);
     if (savedLang) setLang(savedLang);
     if (savedTheme) setTheme(savedTheme);
+    if (savedFocus) setFocusMode(savedFocus === "on");
     if (saved) {
       const parsed = JSON.parse(saved) as {
         projects: Project[];
@@ -329,6 +411,18 @@ export default function Home() {
       setActiveProjectId(parsed.activeProjectId);
       setActiveBoardId(parsed.activeBoardId);
     }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const fsWindow = window as Window &
+      typeof globalThis & {
+        showSaveFilePicker?: (options?: SyncFilePickerOptions) => Promise<SyncFileHandle>;
+        showOpenFilePicker?: (
+          options?: SyncOpenFilePickerOptions
+        ) => Promise<SyncFileHandle[]>;
+      };
+    setSyncSupported(Boolean(fsWindow.showSaveFilePicker || fsWindow.showOpenFilePicker));
   }, []);
 
   useEffect(() => {
@@ -344,6 +438,10 @@ export default function Home() {
   useEffect(() => {
     localStorage.setItem(langKey, lang);
   }, [lang]);
+
+  useEffect(() => {
+    localStorage.setItem(focusKey, focusMode ? "on" : "off");
+  }, [focusMode]);
 
   useEffect(() => {
     localStorage.setItem(
@@ -365,6 +463,10 @@ export default function Home() {
     () => activeProject.boards.find((b) => b.id === activeBoardId) ?? activeProject.boards[0],
     [activeProject, activeBoardId]
   );
+
+  const visibleColumns = focusMode
+    ? activeBoard.columns.filter((col) => col.id !== "col-done")
+    : activeBoard.columns;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
@@ -395,6 +497,57 @@ export default function Home() {
     window.setTimeout(() => setNotice(null), 2200);
   };
 
+  const getTodoColumnId = () =>
+    activeBoard.columns.find((col) => col.id === "col-todo")?.id ??
+    activeBoard.columns[0]?.id;
+
+  const addQuickTask = () => {
+    if (!quickTitle.trim()) return;
+    const columnId = getTodoColumnId();
+    if (!columnId) return;
+    updateBoard((board) => {
+      const tasks = { ...board.tasks };
+      const columns = board.columns.map((col) => ({ ...col }));
+      const target = columns.find((col) => col.id === columnId) ?? columns[0];
+      const newId = getId();
+      tasks[newId] = {
+        id: newId,
+        title: quickTitle.trim(),
+        description: "",
+        assignee: quickAssignee,
+        priority: quickPriority,
+        tags: [],
+        dueDate: "",
+      };
+      if (target) target.taskIds.unshift(newId);
+      return { ...board, tasks, columns };
+    });
+    setQuickTitle("");
+  };
+
+  const startEditWip = (column: Column) => {
+    setWipEditColumnId(column.id);
+    setWipDraft(column.wipLimit ? String(column.wipLimit) : "");
+  };
+
+  const saveWipLimit = () => {
+    if (!wipEditColumnId) return;
+    const nextValue = wipDraft.trim() ? Number(wipDraft) : NaN;
+    updateBoard((board) => {
+      const columns = board.columns.map((col) => {
+        if (col.id !== wipEditColumnId) return col;
+        if (!Number.isFinite(nextValue) || nextValue <= 0) {
+          const { wipLimit, ...rest } = col;
+          return { ...rest } as Column;
+        }
+        return { ...col, wipLimit: Math.floor(nextValue) };
+      });
+      return { ...board, columns };
+    });
+    setWipEditColumnId(null);
+    setWipDraft("");
+  };
+
   const exportData = () => {
     const payload = {
       exportedAt: new Date().toISOString(),
@@ -415,6 +568,114 @@ export default function Home() {
     URL.revokeObjectURL(url);
     pushNotice(t.exportSuccess);
   };
+
+  const buildSyncPayload = () => ({
+    exportedAt: new Date().toISOString(),
+    theme,
+    lang,
+    projects,
+    activeProjectId,
+    activeBoardId,
+  });
+
+  const writeSyncFile = async (notify?: boolean) => {
+    const handle = syncHandle;
+    if (!handle) return;
+    try {
+      const payload = buildSyncPayload();
+      const writable = await handle.createWritable();
+      await writable.write(JSON.stringify(payload, null, 2));
+      await writable.close();
+      setLastSyncAt(payload.exportedAt);
+      if (notify) pushNotice(t.syncSuccess);
+    } catch {
+      if (notify) pushNotice(t.syncFailed);
+    }
+  };
+
+  useEffect(() => {
+    if (!mounted || !syncSupported || !syncHandle) return;
+    if (syncTimerRef.current) window.clearTimeout(syncTimerRef.current);
+    syncTimerRef.current = window.setTimeout(() => {
+      void writeSyncFile();
+    }, 500);
+    return () => {
+      if (syncTimerRef.current) window.clearTimeout(syncTimerRef.current);
+    };
+  }, [
+    projects,
+    activeProjectId,
+    activeBoardId,
+    theme,
+    lang,
+    syncHandle,
+    syncSupported,
+    mounted,
+  ]);
+
+  const connectSyncFile = async () => {
+    if (!isFsAvailable) return;
+    try {
+      const fsWindow = window as Window &
+        typeof globalThis & {
+          showSaveFilePicker?: (options?: SyncFilePickerOptions) => Promise<SyncFileHandle>;
+          showOpenFilePicker?: (
+            options?: SyncOpenFilePickerOptions
+          ) => Promise<SyncFileHandle[]>;
+        };
+      const pickerOptions = {
+        suggestedName: "jarvis-kanban-sync.json",
+        types: [
+          {
+            description: "JSON",
+            accept: { "application/json": [".json"] },
+          },
+        ],
+      };
+      let handle: SyncFileHandle | undefined;
+      if (fsWindow.showSaveFilePicker) {
+        handle = await fsWindow.showSaveFilePicker(pickerOptions);
+      } else if (fsWindow.showOpenFilePicker) {
+        const [picked] = await fsWindow.showOpenFilePicker({
+          multiple: false,
+          types: pickerOptions.types,
+        });
+        handle = picked;
+      }
+      if (!handle) return;
+      setSyncHandle(handle);
+      setSyncFileName(handle.name ?? null);
+      setLastSyncAt(null);
+    } catch (error) {
+      if ((error as DOMException).name !== "AbortError") {
+        pushNotice(t.syncFailed);
+      }
+    }
+  };
+
+  const disconnectSyncFile = () => {
+    setSyncHandle(null);
+    setSyncFileName(null);
+    setLastSyncAt(null);
+  };
+
+  const copySyncPath = async () => {
+    if (!syncFileName) {
+      pushNotice(t.syncPathUnavailable);
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(syncFileName);
+      pushNotice(t.syncPathCopied);
+    } catch {
+      window.alert(syncFileName);
+    }
+  };
+
+  const lastSyncLabel = lastSyncAt
+    ? new Date(lastSyncAt).toLocaleString(lang === "zh" ? "zh-CN" : "en-US")
+    : t.syncNever;
+  const syncFileLabel = syncFileName ?? t.notConnected;
 
   const importData = async (file: File) => {
     try {
@@ -700,6 +961,61 @@ export default function Home() {
                 {t.copySummary}
               </button>
             </div>
+            <div className="flex flex-col gap-2 rounded-2xl bg-white/70 px-3 py-2 text-xs dark:bg-white/5">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-black dark:text-slate-300">{t.syncBridge}</span>
+                <button
+                  onClick={() => void connectSyncFile()}
+                  disabled={!isFsAvailable}
+                  className="rounded-full border border-cyan-500/40 px-3 py-1 text-[10px] text-cyan-600 hover:bg-cyan-500/10 disabled:cursor-not-allowed disabled:opacity-60 dark:text-cyan-200"
+                >
+                  {t.connectFile}
+                </button>
+                <button
+                  onClick={() => void writeSyncFile(true)}
+                  disabled={!isFsAvailable || !isSyncConnected}
+                  className="rounded-full border border-indigo-400/40 px-3 py-1 text-[10px] text-indigo-600 hover:bg-indigo-500/10 disabled:cursor-not-allowed disabled:opacity-60 dark:text-indigo-200"
+                >
+                  {t.syncNow}
+                </button>
+                <button
+                  onClick={disconnectSyncFile}
+                  disabled={!isFsAvailable || !isSyncConnected}
+                  className="rounded-full border border-rose-400/40 px-3 py-1 text-[10px] text-rose-600 hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:opacity-60 dark:text-rose-200"
+                >
+                  {t.disconnect}
+                </button>
+                <button
+                  onClick={() => void copySyncPath()}
+                  disabled={!isFsAvailable || !isSyncConnected}
+                  className="rounded-full border border-emerald-400/40 px-3 py-1 text-[10px] text-emerald-600 hover:bg-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-60 dark:text-emerald-200"
+                >
+                  {t.copySyncPath}
+                </button>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 text-[10px] text-slate-500 dark:text-slate-400">
+                <span>
+                  {t.syncFile}: {syncFileLabel}
+                </span>
+                <span>
+                  {t.lastSync}: {lastSyncLabel}
+                </span>
+              </div>
+              {!isFsAvailable && (
+                <p className="text-[10px] text-amber-600 dark:text-amber-300">
+                  {t.syncUnavailable}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-2 rounded-full bg-white/70 px-3 py-2 text-xs dark:bg-white/5">
+              <span className="text-black dark:text-slate-300">{t.focusMode}</span>
+              <button
+                onClick={() => setFocusMode((prev) => !prev)}
+                className="rounded-full border border-amber-400/40 px-3 py-1 text-[10px] uppercase text-amber-600 dark:text-amber-200"
+              >
+                {focusMode ? t.focusOn : t.focusOff}
+              </button>
+            </div>
             <div className="flex items-center gap-2 rounded-full bg-white/70 px-3 py-2 text-xs dark:bg-white/5">
               <span className="text-black dark:text-slate-300">{t.language}</span>
               <button
@@ -720,6 +1036,49 @@ export default function Home() {
             </div>
           </div>
         </div>
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl bg-white/70 px-4 py-3 text-xs text-black dark:bg-white/5 dark:text-slate-200">
+          <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+            {t.quickAdd}
+          </span>
+          <input
+            className="min-w-[180px] flex-1 rounded-full border border-slate-200/60 bg-white px-3 py-2 text-xs text-black dark:border-white/10 dark:bg-slate-900/60 dark:text-slate-100"
+            placeholder={t.quickTitle}
+            value={quickTitle}
+            onChange={(event) => setQuickTitle(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") addQuickTask();
+            }}
+          />
+          <select
+            className="rounded-full border border-slate-200/60 bg-white px-3 py-2 text-xs text-black dark:border-white/10 dark:bg-slate-900/60 dark:text-slate-100"
+            value={quickAssignee}
+            onChange={(event) => setQuickAssignee(event.target.value)}
+          >
+            {assignees.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+          <select
+            className="rounded-full border border-slate-200/60 bg-white px-3 py-2 text-xs text-black dark:border-white/10 dark:bg-slate-900/60 dark:text-slate-100"
+            value={quickPriority}
+            onChange={(event) =>
+              setQuickPriority(event.target.value as Task["priority"])
+            }
+          >
+            <option value="high">{t.high}</option>
+            <option value="medium">{t.medium}</option>
+            <option value="low">{t.low}</option>
+          </select>
+          <button
+            onClick={addQuickTask}
+            disabled={!quickTitle.trim()}
+            className="rounded-full border border-cyan-500/40 px-4 py-2 text-[10px] text-cyan-600 hover:bg-cyan-500/10 disabled:cursor-not-allowed disabled:opacity-60 dark:text-cyan-200"
+          >
+            {t.addTask}
+          </button>
+        </div>
       </header>
 
       <section className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-4">
@@ -731,16 +1090,22 @@ export default function Home() {
             onDragStart={({ active }) => setActiveTaskId(String(active.id))}
             onDragCancel={() => setActiveTaskId(null)}
           >
-            {activeBoard.columns.map((column) => {
+            {visibleColumns.map((column) => {
               const tasks = column.taskIds
                 .map((id) => activeBoard.tasks[id])
                 .filter((task): task is Task => Boolean(task));
+              const wipLimit = column.wipLimit ?? 0;
+              const isOverWip = wipLimit > 0 && tasks.length > wipLimit;
               return (
                 <div
                   key={column.id}
-                  className="flex flex-col gap-3 rounded-3xl border border-slate-200 bg-white/70 p-4 shadow-lg dark:border-white/10 dark:bg-slate-950/50"
+                  className={`flex flex-col gap-3 rounded-3xl border bg-white/70 p-4 shadow-lg dark:bg-slate-950/50 ${
+                    isOverWip
+                      ? "border-rose-400/60"
+                      : "border-slate-200 dark:border-white/10"
+                  }`}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <div>
                       <h2 className="text-sm font-semibold text-black dark:text-slate-100">
                         {column.title}
@@ -749,12 +1114,62 @@ export default function Home() {
                         {tasks.length} items
                       </p>
                     </div>
-                    <button
-                      onClick={() => openDraft(column.id)}
-                      className="rounded-full border border-cyan-400/40 px-3 py-1 text-[10px] text-cyan-600 hover:bg-cyan-500/10 dark:text-cyan-200"
-                    >
-                      + {t.addCard}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {wipLimit > 0 && (
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-[10px] ${
+                            isOverWip
+                              ? "border-rose-400/60 bg-rose-500/10 text-rose-500 dark:text-rose-300"
+                              : "border-amber-400/40 bg-amber-500/10 text-amber-600 dark:text-amber-300"
+                          }`}
+                        >
+                          WIP {tasks.length}/{wipLimit}
+                        </span>
+                      )}
+                      {isOverWip && (
+                        <span className="rounded-full border border-rose-400/60 bg-rose-500/10 px-2 py-0.5 text-[10px] text-rose-500 dark:text-rose-300">
+                          {t.wipOver}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => openDraft(column.id)}
+                        className="rounded-full border border-cyan-400/40 px-3 py-1 text-[10px] text-cyan-600 hover:bg-cyan-500/10 dark:text-cyan-200"
+                      >
+                        + {t.addCard}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400">
+                    <span>{t.wipLimit}</span>
+                    {wipEditColumnId === column.id ? (
+                      <>
+                        <input
+                          className="w-16 rounded-full border border-slate-200/60 bg-white px-2 py-1 text-[10px] text-black dark:border-white/10 dark:bg-slate-900/60 dark:text-slate-100"
+                          value={wipDraft}
+                          onChange={(event) => setWipDraft(event.target.value)}
+                          placeholder="-"
+                        />
+                        <button
+                          onClick={saveWipLimit}
+                          className="rounded-full border border-emerald-400/40 px-2 py-1 text-[10px] text-emerald-600 hover:bg-emerald-500/10 dark:text-emerald-200"
+                        >
+                          {t.save}
+                        </button>
+                        <button
+                          onClick={() => setWipEditColumnId(null)}
+                          className="rounded-full border border-slate-300/40 px-2 py-1 text-[10px] text-slate-600 hover:bg-slate-200/40 dark:text-slate-300"
+                        >
+                          {t.cancel}
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => startEditWip(column)}
+                        className="rounded-full border border-slate-300/40 px-2 py-1 text-[10px] text-slate-600 hover:bg-slate-200/40 dark:text-slate-300"
+                      >
+                        {wipLimit > 0 ? wipLimit : "-"}
+                      </button>
+                    )}
                   </div>
 
                   <ColumnDroppable id={column.id}>
