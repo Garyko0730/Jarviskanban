@@ -47,6 +47,27 @@ npm run dev
 - “断开”仅清除内存中的连接句柄，刷新页面后需要重新连接。
 - “复制同步路径”会复制浏览器提供的文件名（出于安全限制无法读取完整路径）。
 
+## Local Sync Agent（自动读取）
+
+让 Jarvis 自动读取同步文件，生成机器可读快照和摘要。
+
+**Windows（PowerShell）**
+```bash
+set SYNC_FILE=C:\path\to\jarvis-kanban-sync.json
+npm run sync:watch
+```
+
+**macOS / Linux**
+```bash
+SYNC_FILE=/path/to/jarvis-kanban-sync.json npm run sync:watch
+```
+
+输出文件：
+- `.sync/latest.json`（完整 JSON 快照）
+- `.sync/summary.md`（可读摘要）
+
+> 只要本地 agent 在运行，Jarvis 就能直接读取这些输出文件。
+
 ## 技术栈
 
 - Next.js (App Router)
