@@ -50,11 +50,19 @@ const pickSyncFile = async () => {
   return result.filePaths[0];
 };
 
+const getElectronBin = () => {
+  if (fs.existsSync(process.execPath)) return process.execPath;
+  const fallback = app.getPath("exe");
+  if (fs.existsSync(fallback)) return fallback;
+  return process.execPath;
+};
+
 const startSyncAgent = (syncFile) => {
   if (!syncFile) return;
   if (syncAgent) syncAgent.kill();
   const scriptPath = getUnpackedPath("scripts/sync-agent.js");
-  syncAgent = spawn(process.execPath, ["--run-as-node", scriptPath, "--file", syncFile], {
+  const electronBin = getElectronBin();
+  syncAgent = spawn(electronBin, ["--run-as-node", scriptPath, "--file", syncFile], {
     stdio: "ignore",
     cwd: getAppRoot(),
   });
@@ -111,7 +119,8 @@ const startNextServer = async () => {
   if (nextProcess) return;
   currentPort = await findFreePort();
   const nextBin = getUnpackedPath("node_modules/next/dist/bin/next");
-  nextProcess = spawn(process.execPath, ["--run-as-node", nextBin, "start", "-p", String(currentPort)], {
+  const electronBin = getElectronBin();
+  nextProcess = spawn(electronBin, ["--run-as-node", nextBin, "start", "-p", String(currentPort)], {
     stdio: "ignore",
     cwd: getAppRoot(),
   });
