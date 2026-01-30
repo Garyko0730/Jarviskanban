@@ -72,7 +72,7 @@ SYNC_FILE=/path/to/jarvis-kanban-sync.json npm run sync:watch
 
 双击运行：
 ```
-C:\Users\Gary_\tmp\jarviskanban\scripts\jarvis-launcher.cmd
+C:\Users\Gary_\tmp\jarviskanban\scripts\jarvis-oneclick.cmd
 ```
 
 它会弹出选择框，让你选同步文件，并自动启动：
