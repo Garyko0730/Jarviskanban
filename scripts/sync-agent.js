@@ -182,15 +182,24 @@ const readSyncFile = () => {
       return;
     }
     const stat = fs.statSync(syncFile);
-    if (stat.mtimeMs <= lastMtime) return;
     const raw = fs.readFileSync(syncFile, "utf8");
     const data = JSON.parse(raw);
-    const changed = updateBoardForJarvis(data);
+    let changed = false;
+
+    if (stat.mtimeMs > lastMtime) {
+      changed = updateBoardForJarvis(data) || changed;
+      lastMtime = stat.mtimeMs;
+    }
+
+    // Always check reply queue so we can write back even if sync file didn't change
+    changed = applyQueuedReplies(data) || changed;
+
     if (changed) {
       data.exportedAt = new Date().toISOString();
       fs.writeFileSync(syncFile, JSON.stringify(data, null, 2));
+      lastMtime = fs.statSync(syncFile).mtimeMs;
     }
-    lastMtime = stat.mtimeMs;
+
     lastGood = data;
     writeOutputs(data);
   } catch (error) {
