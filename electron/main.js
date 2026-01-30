@@ -138,14 +138,14 @@ const waitForServer = (url, timeoutMs = 15000) =>
   });
 
 const startNextServer = async () => {
-  if (process.env.ELECTRON_DEV === "1") return;
+  if (process.env.ELECTRON_DEV !== "1") return;
   if (nextProcess) return;
   currentPort = await findFreePort();
   const nextBin = getUnpackedPath("node_modules/next/dist/bin/next");
   const electronBin = resolveElectronBin();
   nextProcess = spawnSafe(
     electronBin,
-    ["--run-as-node", nextBin, "start", "-p", String(currentPort)],
+    ["--run-as-node", nextBin, "dev", "-p", String(currentPort)],
     { stdio: "ignore", cwd: getWorkDir() }
   );
   await waitForServer(`http://localhost:${currentPort}`);
@@ -162,11 +162,12 @@ const createWindow = async () => {
     },
   });
 
-  const targetUrl = process.env.ELECTRON_DEV === "1"
-    ? "http://localhost:3000"
-    : `http://localhost:${currentPort}`;
-
-  await mainWindow.loadURL(targetUrl);
+  if (process.env.ELECTRON_DEV === "1") {
+    await mainWindow.loadURL(`http://localhost:${currentPort}`);
+  } else {
+    const indexPath = resolveScript("out/index.html");
+    await mainWindow.loadFile(indexPath);
+  }
 };
 
 const buildMenu = () => {
