@@ -57,15 +57,37 @@ const getElectronBin = () => {
   return process.execPath;
 };
 
+const resolveElectronBin = () => {
+  const candidates = [
+    process.execPath,
+    app.getPath("exe"),
+    path.join(process.resourcesPath, "..", `${app.getName()}.exe`),
+  ];
+  return candidates.find((candidate) => candidate && fs.existsSync(candidate));
+};
+
+const spawnSafe = (command, args, options) => {
+  if (!command) return null;
+  const child = spawn(command, args, options);
+  child.on("error", (error) => {
+    dialog.showErrorBox(
+      "Jarvis Kanban",
+      `Failed to start background process: ${error.message}`
+    );
+  });
+  return child;
+};
+
 const startSyncAgent = (syncFile) => {
   if (!syncFile) return;
   if (syncAgent) syncAgent.kill();
   const scriptPath = getUnpackedPath("scripts/sync-agent.js");
-  const electronBin = getElectronBin();
-  syncAgent = spawn(electronBin, ["--run-as-node", scriptPath, "--file", syncFile], {
-    stdio: "ignore",
-    cwd: getAppRoot(),
-  });
+  const electronBin = resolveElectronBin();
+  syncAgent = spawnSafe(
+    electronBin,
+    ["--run-as-node", scriptPath, "--file", syncFile],
+    { stdio: "ignore", cwd: getAppRoot() }
+  );
 };
 
 const ensureSyncFile = async () => {
@@ -119,11 +141,12 @@ const startNextServer = async () => {
   if (nextProcess) return;
   currentPort = await findFreePort();
   const nextBin = getUnpackedPath("node_modules/next/dist/bin/next");
-  const electronBin = getElectronBin();
-  nextProcess = spawn(electronBin, ["--run-as-node", nextBin, "start", "-p", String(currentPort)], {
-    stdio: "ignore",
-    cwd: getAppRoot(),
-  });
+  const electronBin = resolveElectronBin();
+  nextProcess = spawnSafe(
+    electronBin,
+    ["--run-as-node", nextBin, "start", "-p", String(currentPort)],
+    { stdio: "ignore", cwd: getAppRoot() }
+  );
   await waitForServer(`http://localhost:${currentPort}`);
 };
 
