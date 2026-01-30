@@ -38,6 +38,10 @@
     "appId": "com.jarvis.kanban",
     "productName": "Jarvis Kanban",
     "asar": true,
+    "asarUnpack": [
+      "scripts/**",
+      "node_modules/next/**"
+    ],
     "files": [
       "electron/**/*",
       ".next/**/*",

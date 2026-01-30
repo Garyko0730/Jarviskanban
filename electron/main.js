@@ -14,7 +14,15 @@ const syncConfigPath = path.join(userDataPath, "sync.json");
 
 const getAppRoot = () => app.getAppPath();
 
-const resolveScript = (relativePath) => path.join(getAppRoot(), relativePath);
+const getUnpackedPath = (relativePath) =>
+  app.isPackaged
+    ? path.join(process.resourcesPath, "app.asar.unpacked", relativePath)
+    : path.join(getAppRoot(), relativePath);
+
+const resolveScript = (relativePath) =>
+  app.isPackaged
+    ? path.join(process.resourcesPath, "app.asar", relativePath)
+    : path.join(getAppRoot(), relativePath);
 
 const loadSyncConfig = () => {
   try {
@@ -45,7 +53,7 @@ const pickSyncFile = async () => {
 const startSyncAgent = (syncFile) => {
   if (!syncFile) return;
   if (syncAgent) syncAgent.kill();
-  const scriptPath = resolveScript("scripts/sync-agent.js");
+  const scriptPath = getUnpackedPath("scripts/sync-agent.js");
   syncAgent = spawn(process.execPath, [scriptPath, "--file", syncFile], {
     stdio: "ignore",
     cwd: getAppRoot(),
@@ -102,7 +110,7 @@ const startNextServer = async () => {
   if (process.env.ELECTRON_DEV === "1") return;
   if (nextProcess) return;
   currentPort = await findFreePort();
-  const nextBin = resolveScript("node_modules/next/dist/bin/next");
+  const nextBin = getUnpackedPath("node_modules/next/dist/bin/next");
   nextProcess = spawn(process.execPath, [nextBin, "start", "-p", String(currentPort)], {
     stdio: "ignore",
     cwd: getAppRoot(),
