@@ -71,6 +71,13 @@ SYNC_FILE=/path/to/jarvis-kanban-sync.json npm run sync:watch
 - 追加对话消息到面板（Conversation 区域）
 - 若标签包含“完成/done/completed”，自动移入「评审」
 
+## Jarvis 回复回写
+
+我完成任务后，会通过 reply 队列回写到面板对话，并可自动移入评审：
+```bash
+node scripts/jarvis-reply.js --file <sync.json> --message "答复内容" --title "任务标题" --complete
+```
+
 > 只要本地 agent 在运行，Jarvis 就能直接读取这些输出文件。
 
 ## 一键启动（Windows）

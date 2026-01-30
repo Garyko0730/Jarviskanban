@@ -15,6 +15,7 @@ const intervalMs = Number(getArg("interval") || process.env.SYNC_INTERVAL || 150
 const outDir = path.resolve(process.cwd(), ".sync");
 const latestPath = path.resolve(outDir, getArg("out") || "latest.json");
 const summaryPath = path.resolve(outDir, getArg("summary") || "summary.md");
+const replyQueuePath = path.resolve(outDir, "assistant-replies.json");
 
 if (!syncFile) {
   console.error("[sync-agent] Missing sync file path. Use --file <path> or set SYNC_FILE.");
@@ -92,6 +93,46 @@ const moveTask = (board, taskId, targetColumnId) => {
   if (target) target.taskIds.unshift(taskId);
 };
 
+const applyQueuedReplies = (data) => {
+  if (!fs.existsSync(replyQueuePath)) return false;
+  let queue = [];
+  try {
+    queue = JSON.parse(fs.readFileSync(replyQueuePath, "utf8"));
+  } catch {
+    queue = [];
+  }
+  if (!Array.isArray(queue) || queue.length === 0) return false;
+
+  let changed = false;
+  const project = data.projects?.find((p) => p.id === data.activeProjectId) || data.projects?.[0];
+  const board = project?.boards?.find((b) => b.id === data.activeBoardId) || project?.boards?.[0];
+  if (!board || !board.columns || !board.tasks) return false;
+
+  const reviewId = board.columns.find((c) => c.id === "col-review")?.id;
+
+  queue.forEach((item) => {
+    if (item.syncFile && path.resolve(item.syncFile) !== path.resolve(syncFile)) return;
+    pushMessage(board, item.content, "assistant");
+
+    let task = null;
+    if (item.taskId) task = board.tasks[item.taskId];
+    if (!task && item.title) {
+      task = Object.values(board.tasks).find((t) => t.title === item.title) || null;
+    }
+
+    if (task && item.markComplete && reviewId) {
+      const tags = task.tags || [];
+      if (!tags.includes("完成")) task.tags = Array.from(new Set([...tags, "完成"]));
+      moveTask(board, task.id, reviewId);
+      pushMessage(board, `任务完成：${task.title}，已移入评审。`, "assistant");
+    }
+    changed = true;
+  });
+
+  fs.writeFileSync(replyQueuePath, JSON.stringify([], null, 2));
+  return changed;
+};
+
 const updateBoardForJarvis = (data) => {
   const project = data.projects?.find((p) => p.id === data.activeProjectId) || data.projects?.[0];
   const board = project?.boards?.find((b) => b.id === data.activeBoardId) || project?.boards?.[0];
@@ -128,6 +169,8 @@ const updateBoardForJarvis = (data) => {
       }
     });
   });
+
+  if (applyQueuedReplies(data)) changed = true;
 
   return changed;
 };
