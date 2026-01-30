@@ -21,6 +21,48 @@ if (!syncFile || !content) {
   process.exit(1);
 }
 
+const normalize = (value) => (value || "").trim().toLowerCase();
+
+const resolveTarget = () => {
+  if (!fs.existsSync(syncFile)) return null;
+  try {
+    const raw = fs.readFileSync(syncFile, "utf8");
+    const data = JSON.parse(raw);
+    const project = data.projects?.find((p) => p.id === data.activeProjectId) || data.projects?.[0];
+    const board = project?.boards?.find((b) => b.id === data.activeBoardId) || project?.boards?.[0];
+    if (!board || !board.columns || !board.tasks) return null;
+
+    if (taskId && board.tasks[taskId]) return { id: taskId, title: board.tasks[taskId].title };
+
+    if (taskTitle) {
+      const exact = Object.values(board.tasks).find(
+        (t) => normalize(t.title) === normalize(taskTitle)
+      );
+      if (exact) return { id: exact.id, title: exact.title };
+
+      const fuzzy = Object.values(board.tasks).find(
+        (t) => normalize(t.title).includes(normalize(taskTitle))
+      );
+      if (fuzzy) return { id: fuzzy.id, title: fuzzy.title };
+    }
+
+    const progress = board.columns.find((c) => c.id === "col-progress");
+    if (progress) {
+      const candidates = progress.taskIds
+        .map((id) => board.tasks[id])
+        .filter((t) => t && t.assignee && t.assignee.toLowerCase().includes("jarvis"));
+      if (candidates.length > 0) {
+        const latest = candidates[candidates.length - 1];
+        return { id: latest.id, title: latest.title };
+      }
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+};
+
 const outDir = path.resolve(process.cwd(), ".sync");
 const queuePath = path.resolve(outDir, "assistant-replies.json");
 
@@ -35,10 +77,12 @@ if (fs.existsSync(queuePath)) {
   }
 }
 
+const resolved = resolveTarget();
+
 queue.push({
   id: `reply-${Date.now()}-${Math.random()}`,
-  taskId,
-  title: taskTitle,
+  taskId: resolved?.id ?? taskId ?? null,
+  title: resolved?.title ?? taskTitle ?? null,
   content,
   markComplete,
   createdAt: new Date().toISOString(),

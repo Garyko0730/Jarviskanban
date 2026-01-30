@@ -76,6 +76,7 @@ SYNC_FILE=/path/to/jarvis-kanban-sync.json npm run sync:watch
 我完成任务后，会通过 reply 队列回写到面板对话，并可自动移入评审：
 ```bash
 node scripts/jarvis-reply.js --file <sync.json> --message "答复内容" --title "任务标题" --complete
+# 若标题不匹配，会自动选择「进行中」里最近的 @Jarvis 任务
 ```
 
 > 只要本地 agent 在运行，Jarvis 就能直接读取这些输出文件。
