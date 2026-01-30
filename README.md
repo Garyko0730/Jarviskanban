@@ -43,7 +43,7 @@ npm run dev
 
 - 在支持 **File System Access API** 的浏览器中使用（如 Chrome / Edge），不支持时会显示提示并禁用按钮。
 - 点击“连接文件”选择或创建 `jarvis-kanban-sync.json`。
-- 点击“立即同步”写入当前状态；之后每次变更会在 500ms 内自动写入。
+- 点击“立即同步”写入当前状态；**自动同步可开关**，开启后每次变更会在 500ms 内写入。
 - “断开”仅清除内存中的连接句柄，刷新页面后需要重新连接。
 - “复制同步路径”会复制浏览器提供的文件名（出于安全限制无法读取完整路径）。
 
@@ -67,6 +67,18 @@ SYNC_FILE=/path/to/jarvis-kanban-sync.json npm run sync:watch
 - `.sync/summary.md`（可读摘要）
 
 > 只要本地 agent 在运行，Jarvis 就能直接读取这些输出文件。
+
+## 一键启动（Windows）
+
+双击运行：
+```
+C:\Users\Gary_\tmp\jarviskanban\scripts\jarvis-launcher.cmd
+```
+
+它会弹出选择框，让你选同步文件，并自动启动：
+- 面板（npm run dev）
+- 同步代理（npm run sync:watch）
+- 浏览器页面
 
 ## 技术栈
 
