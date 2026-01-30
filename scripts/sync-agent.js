@@ -185,7 +185,15 @@ const readSyncFile = () => {
     }
     const stat = fs.statSync(syncFile);
     const raw = fs.readFileSync(syncFile, "utf8");
-    const data = JSON.parse(raw);
+
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch (parseError) {
+      console.warn(`[sync-agent] failed to read sync file: ${parseError.message}`);
+      return;
+    }
+
     let changed = false;
 
     if (stat.mtimeMs > lastMtime) {
