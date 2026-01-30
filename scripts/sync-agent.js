@@ -111,7 +111,6 @@ const applyQueuedReplies = (data) => {
   const reviewId = board.columns.find((c) => c.id === "col-review")?.id;
 
   queue.forEach((item) => {
-    if (item.syncFile && path.resolve(item.syncFile) !== path.resolve(syncFile)) return;
     pushMessage(board, item.content, "assistant");
 
     let task = null;
@@ -130,6 +129,9 @@ const applyQueuedReplies = (data) => {
   });
 
   fs.writeFileSync(replyQueuePath, JSON.stringify([], null, 2));
+  if (changed) {
+    console.log("[sync-agent] applied reply queue");
+  }
   return changed;
 };
 
