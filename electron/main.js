@@ -184,6 +184,17 @@ const buildMenu = () => {
             }
           },
         },
+        {
+          label: "Disable Sync Agent (Safe Mode)",
+          click: () => {
+            if (syncAgent) syncAgent.kill();
+            syncAgent = null;
+            dialog.showMessageBox({
+              type: "info",
+              message: "Sync agent stopped. Restart app to enable again.",
+            });
+          },
+        },
         { type: "separator" },
         { role: "quit" },
       ],
@@ -195,8 +206,11 @@ const buildMenu = () => {
 
 app.whenReady().then(async () => {
   buildMenu();
-  await ensureSyncFile();
   await createWindow();
+  const skipSync = process.argv.includes("--no-sync");
+  if (!skipSync) {
+    await ensureSyncFile();
+  }
 });
 
 app.on("window-all-closed", () => {

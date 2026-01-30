@@ -94,6 +94,9 @@ npm run electron:build
 
 输出在 `dist/`，双击安装后运行即可。首次启动会弹出同步文件选择器。
 
+> 如果出现卡顿，可用安全模式启动（禁用同步代理）：
+> 在快捷方式目标后追加 `--no-sync`
+
 ## 技术栈
 
 - Next.js (App Router)
