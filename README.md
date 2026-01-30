@@ -66,6 +66,11 @@ SYNC_FILE=/path/to/jarvis-kanban-sync.json npm run sync:watch
 - `.sync/latest.json`（完整 JSON 快照）
 - `.sync/summary.md`（可读摘要）
 
+自动协作行为：
+- 识别 @Jarvis 任务后自动标记“已读”并移入「进行中」
+- 追加对话消息到面板（Conversation 区域）
+- 若标签包含“完成/done/completed”，自动移入「评审」
+
 > 只要本地 agent 在运行，Jarvis 就能直接读取这些输出文件。
 
 ## 一键启动（Windows）

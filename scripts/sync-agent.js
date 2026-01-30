@@ -73,6 +73,65 @@ const writeOutputs = (data) => {
   console.log(`[sync-agent] updated ${new Date().toISOString()} from ${path.basename(syncFile)}`);
 };
 
+const pushMessage = (board, content, role = "assistant") => {
+  if (!board.messages) board.messages = [];
+  board.messages.unshift({
+    id: `msg-${Date.now()}-${Math.random()}`,
+    role,
+    content,
+    createdAt: new Date().toISOString(),
+  });
+  board.messages = board.messages.slice(0, 50);
+};
+
+const moveTask = (board, taskId, targetColumnId) => {
+  board.columns.forEach((col) => {
+    col.taskIds = col.taskIds.filter((id) => id !== taskId);
+  });
+  const target = board.columns.find((col) => col.id === targetColumnId);
+  if (target) target.taskIds.unshift(taskId);
+};
+
+const updateBoardForJarvis = (data) => {
+  const project = data.projects?.find((p) => p.id === data.activeProjectId) || data.projects?.[0];
+  const board = project?.boards?.find((b) => b.id === data.activeBoardId) || project?.boards?.[0];
+  if (!board || !board.columns || !board.tasks) return false;
+
+  let changed = false;
+  const todoId = board.columns.find((c) => c.id === "col-todo")?.id;
+  const progressId = board.columns.find((c) => c.id === "col-progress")?.id;
+  const reviewId = board.columns.find((c) => c.id === "col-review")?.id;
+
+  if (!todoId || !progressId || !reviewId) return false;
+
+  board.columns.forEach((col) => {
+    col.taskIds.forEach((taskId) => {
+      const task = board.tasks[taskId];
+      if (!task) return;
+      const tags = task.tags || [];
+      const isJarvis = task.assignee && task.assignee.toLowerCase().includes("jarvis");
+
+      if (col.id === todoId && isJarvis && !tags.includes("已读")) {
+        task.tags = Array.from(new Set([...tags, "已读"]));
+        moveTask(board, taskId, progressId);
+        pushMessage(board, `已读任务：${task.title}，已移入进行中。`);
+        changed = true;
+      }
+
+      if (col.id === progressId && tags.some((t) => ["完成", "done", "completed"].includes(t.toLowerCase?.() ?? t))) {
+        if (!tags.includes("评审中")) {
+          task.tags = Array.from(new Set([...tags, "评审中"]));
+        }
+        moveTask(board, taskId, reviewId);
+        pushMessage(board, `任务完成：${task.title}，已移入评审。`);
+        changed = true;
+      }
+    });
+  });
+
+  return changed;
+};
+
 const readSyncFile = () => {
   try {
     if (!fs.existsSync(syncFile)) {
@@ -83,6 +142,10 @@ const readSyncFile = () => {
     if (stat.mtimeMs <= lastMtime) return;
     const raw = fs.readFileSync(syncFile, "utf8");
     const data = JSON.parse(raw);
+    const changed = updateBoardForJarvis(data);
+    if (changed) {
+      fs.writeFileSync(syncFile, JSON.stringify(data, null, 2));
+    }
     lastMtime = stat.mtimeMs;
     lastGood = data;
     writeOutputs(data);

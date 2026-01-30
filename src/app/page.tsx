@@ -58,6 +58,9 @@ const i18n = {
     syncPathCopied: "同步路径已复制",
     syncPathUnavailable: "无法获取路径",
     syncNever: "尚未同步",
+    conversation: "对话",
+    assistantReply: "Jarvis 回复",
+    readTag: "已读",
     exportSuccess: "已导出看板数据",
     importFailed: "导入失败，请检查文件格式",
     copySuccess: "已复制到剪贴板",
@@ -119,6 +122,9 @@ const i18n = {
     syncPathCopied: "Sync path copied",
     syncPathUnavailable: "Sync path unavailable",
     syncNever: "Never",
+    conversation: "Conversation",
+    assistantReply: "Jarvis Reply",
+    readTag: "Read",
     exportSuccess: "Board data exported",
     importFailed: "Import failed. Check the file format",
     copySuccess: "Copied to clipboard",
@@ -165,11 +171,19 @@ type Column = {
   wipLimit?: number;
 };
 
+type Message = {
+  id: string;
+  role: "assistant" | "system";
+  content: string;
+  createdAt: string;
+};
+
 type Board = {
   id: string;
   name: string;
   columns: Column[];
   tasks: Record<string, Task>;
+  messages?: Message[];
 };
 
 type Project = {
@@ -212,6 +226,7 @@ const defaultBoard = (lang: Lang): Board => {
       [task1.id]: task1,
       [task2.id]: task2,
     },
+    messages: [],
   };
 };
 
@@ -1102,6 +1117,37 @@ export default function Home() {
           </button>
         </div>
       </header>
+
+      {activeBoard.messages && activeBoard.messages.length > 0 && (
+        <section className="mt-6 rounded-3xl border border-slate-200 bg-white/70 p-4 text-xs text-black shadow-lg dark:border-white/10 dark:bg-slate-950/50 dark:text-slate-100">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold">{t.conversation}</h3>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400">
+              {activeBoard.messages.length}
+            </span>
+          </div>
+          <div className="mt-3 space-y-2">
+            {activeBoard.messages.map((msg) => (
+              <div
+                key={msg.id}
+                className="rounded-2xl border border-white/10 bg-white/60 px-3 py-2 text-xs dark:bg-white/5"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-cyan-600 dark:text-cyan-300">
+                    {msg.role === "assistant" ? t.assistantReply : "System"}
+                  </span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                    {new Date(msg.createdAt).toLocaleString(
+                      lang === "zh" ? "zh-CN" : "en-US"
+                    )}
+                  </span>
+                </div>
+                <p className="mt-2 text-[12px] leading-relaxed">{msg.content}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-4">
         {mounted ? (
