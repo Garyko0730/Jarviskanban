@@ -49,6 +49,7 @@ const i18n = {
     autoSync: "自动同步",
     autoOn: "开启",
     autoOff: "关闭",
+    refreshSync: "刷新同步",
     syncFile: "同步文件",
     lastSync: "最后同步",
     notConnected: "未连接",
@@ -116,6 +117,7 @@ const i18n = {
     autoSync: "Auto Sync",
     autoOn: "On",
     autoOff: "Off",
+    refreshSync: "Refresh",
     syncFile: "Sync File",
     lastSync: "Last Sync",
     notConnected: "Not connected",
@@ -637,6 +639,32 @@ export default function Home() {
     }
   };
 
+  const refreshFromSync = async () => {
+    const handle = syncHandle;
+    if (!handle || !handle.getFile) return;
+    try {
+      const file = await handle.getFile();
+      const text = await file.text();
+      const parsed = JSON.parse(text) as {
+        exportedAt?: string;
+        projects?: Project[];
+        activeProjectId?: string;
+        activeBoardId?: string;
+        theme?: "dark" | "light";
+        lang?: Lang;
+      };
+      if (!parsed.projects || parsed.projects.length === 0) return;
+      setProjects(parsed.projects);
+      if (parsed.activeProjectId) setActiveProjectId(parsed.activeProjectId);
+      if (parsed.activeBoardId) setActiveBoardId(parsed.activeBoardId);
+      if (parsed.theme) setTheme(parsed.theme);
+      if (parsed.lang) setLang(parsed.lang);
+      if (parsed.exportedAt) setRemoteSyncAt(parsed.exportedAt);
+    } catch {
+      pushNotice(t.syncFailed);
+    }
+  };
+
   useEffect(() => {
     if (!mounted || !syncSupported || !syncHandle || !autoSync) return;
     if (syncTimerRef.current) window.clearTimeout(syncTimerRef.current);
@@ -1061,6 +1089,13 @@ export default function Home() {
                   className="rounded-full border border-amber-400/40 px-3 py-1 text-[10px] text-amber-600 hover:bg-amber-500/10 disabled:cursor-not-allowed disabled:opacity-60 dark:text-amber-200"
                 >
                   {t.autoSync} {autoSync ? t.autoOn : t.autoOff}
+                </button>
+                <button
+                  onClick={() => void refreshFromSync()}
+                  disabled={!isFsAvailable || !isSyncConnected}
+                  className="rounded-full border border-slate-400/40 px-3 py-1 text-[10px] text-slate-600 hover:bg-slate-200/40 disabled:cursor-not-allowed disabled:opacity-60 dark:text-slate-300"
+                >
+                  {t.refreshSync}
                 </button>
                 <button
                   onClick={() => void writeSyncFile(true)}
