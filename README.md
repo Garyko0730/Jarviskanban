@@ -80,6 +80,20 @@ C:\Users\Gary_\tmp\jarviskanban\scripts\jarvis-launcher.cmd
 - 同步代理（npm run sync:watch）
 - 浏览器页面
 
+## 桌面 EXE（Electron）
+
+**开发模式**
+```bash
+npm run electron:dev
+```
+
+**打包 Windows EXE**
+```bash
+npm run electron:build
+```
+
+输出在 `dist/`，双击安装后运行即可。首次启动会弹出同步文件选择器。
+
 ## 技术栈
 
 - Next.js (App Router)
