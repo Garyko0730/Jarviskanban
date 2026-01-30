@@ -384,7 +384,7 @@ export default function Home() {
   const [mounted, setMounted] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [quickTitle, setQuickTitle] = useState("");
-  const [quickAssignee, setQuickAssignee] = useState(assignees[0]);
+  const [quickAssignee, setQuickAssignee] = useState<string>(assignees[0]);
   const [quickPriority, setQuickPriority] = useState<Task["priority"]>("medium");
   const [wipEditColumnId, setWipEditColumnId] = useState<string | null>(null);
   const [wipDraft, setWipDraft] = useState<string>("");
