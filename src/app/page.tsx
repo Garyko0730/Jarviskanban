@@ -262,6 +262,7 @@ type SyncFileHandle = {
     write: (data: string) => Promise<void>;
     close: () => Promise<void>;
   }>;
+  getFile?: () => Promise<File>;
 };
 
 type SyncFilePickerOptions = {
@@ -407,9 +408,11 @@ export default function Home() {
   const [syncHandle, setSyncHandle] = useState<SyncFileHandle | null>(null);
   const [syncFileName, setSyncFileName] = useState<string | null>(null);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const [remoteSyncAt, setRemoteSyncAt] = useState<string | null>(null);
   const [syncSupported, setSyncSupported] = useState(false);
   const [autoSync, setAutoSync] = useState(true);
   const syncTimerRef = useRef<number | null>(null);
+  const syncReadRef = useRef<number | null>(null);
 
   const t = i18n[lang];
   const isFsAvailable = syncSupported;
@@ -616,6 +619,7 @@ export default function Home() {
       await writable.write(JSON.stringify(payload, null, 2));
       await writable.close();
       setLastSyncAt(payload.exportedAt);
+      setRemoteSyncAt(payload.exportedAt);
       if (notify) pushNotice(t.syncSuccess);
     } catch {
       if (notify) pushNotice(t.syncFailed);
@@ -642,6 +646,41 @@ export default function Home() {
     mounted,
     autoSync,
   ]);
+
+  useEffect(() => {
+    if (!mounted || !syncSupported || !syncHandle || !autoSync) return;
+    const handle = syncHandle;
+    if (syncReadRef.current) window.clearInterval(syncReadRef.current);
+    syncReadRef.current = window.setInterval(async () => {
+      if (!handle.getFile) return;
+      try {
+        const file = await handle.getFile();
+        const text = await file.text();
+        const parsed = JSON.parse(text) as {
+          exportedAt?: string;
+          projects?: Project[];
+          activeProjectId?: string;
+          activeBoardId?: string;
+          theme?: "dark" | "light";
+          lang?: Lang;
+        };
+        if (!parsed.projects || parsed.projects.length === 0) return;
+        if (parsed.exportedAt && parsed.exportedAt === remoteSyncAt) return;
+        if (parsed.exportedAt && parsed.exportedAt === lastSyncAt) return;
+        setProjects(parsed.projects);
+        if (parsed.activeProjectId) setActiveProjectId(parsed.activeProjectId);
+        if (parsed.activeBoardId) setActiveBoardId(parsed.activeBoardId);
+        if (parsed.theme) setTheme(parsed.theme);
+        if (parsed.lang) setLang(parsed.lang);
+        setRemoteSyncAt(parsed.exportedAt ?? new Date().toISOString());
+      } catch {
+        // ignore
+      }
+    }, 2000);
+    return () => {
+      if (syncReadRef.current) window.clearInterval(syncReadRef.current);
+    };
+  }, [syncHandle, syncSupported, mounted, autoSync, remoteSyncAt, lastSyncAt]);
 
   const connectSyncFile = async () => {
     if (!isFsAvailable) return;

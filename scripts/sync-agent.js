@@ -144,6 +144,7 @@ const readSyncFile = () => {
     const data = JSON.parse(raw);
     const changed = updateBoardForJarvis(data);
     if (changed) {
+      data.exportedAt = new Date().toISOString();
       fs.writeFileSync(syncFile, JSON.stringify(data, null, 2));
     }
     lastMtime = stat.mtimeMs;
