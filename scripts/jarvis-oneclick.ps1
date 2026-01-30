@@ -20,8 +20,8 @@ if (-not $selected) {
 
 $env:SYNC_FILE = $selected
 
-Start-Process "npm" -ArgumentList "run", "sync:watch" -WorkingDirectory $projectRoot
-Start-Process "npm" -ArgumentList "run", "dev" -WorkingDirectory $projectRoot
+Start-Process "npm" -ArgumentList "run", "sync:watch" -WorkingDirectory $projectRoot -WindowStyle Minimized
+Start-Process "npm" -ArgumentList "run", "dev" -WorkingDirectory $projectRoot -WindowStyle Minimized
 Start-Sleep -Seconds 3
 Start-Process "http://localhost:3000"
 

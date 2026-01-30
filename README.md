@@ -75,10 +75,15 @@ SYNC_FILE=/path/to/jarvis-kanban-sync.json npm run sync:watch
 C:\Users\Gary_\tmp\jarviskanban\scripts\jarvis-oneclick.cmd
 ```
 
-它会弹出选择框，让你选同步文件，并自动启动：
+它会弹出选择框，让你选同步文件，并自动启动（后台最小化）：
 - 面板（npm run dev）
 - 同步代理（npm run sync:watch）
 - 浏览器页面
+
+**生成桌面快捷方式（推荐）**
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\Gary_\tmp\jarviskanban\scripts\jarvis-make-shortcut.ps1
+```
 
 ## 技术栈
 
