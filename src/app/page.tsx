@@ -241,6 +241,7 @@ const themeKey = "jarvis-kanban-theme";
 const langKey = "jarvis-kanban-lang";
 const focusKey = "jarvis-kanban-focus";
 const autoSyncKey = "jarvis-kanban-auto-sync";
+const syncHintKey = "jarvis-kanban-sync-hint";
 
 const getId = () =>
   globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random()}`;
@@ -411,6 +412,7 @@ export default function Home() {
   const [remoteSyncAt, setRemoteSyncAt] = useState<string | null>(null);
   const [syncSupported, setSyncSupported] = useState(false);
   const [autoSync, setAutoSync] = useState(true);
+  const [syncHint, setSyncHint] = useState<string | null>(null);
   const syncTimerRef = useRef<number | null>(null);
   const syncReadRef = useRef<number | null>(null);
 
@@ -425,10 +427,12 @@ export default function Home() {
     const savedTheme = localStorage.getItem(themeKey) as "dark" | "light" | null;
     const savedFocus = localStorage.getItem(focusKey);
     const savedAutoSync = localStorage.getItem(autoSyncKey);
+    const savedSyncHint = localStorage.getItem(syncHintKey);
     if (savedLang) setLang(savedLang);
     if (savedTheme) setTheme(savedTheme);
     if (savedFocus) setFocusMode(savedFocus === "on");
     if (savedAutoSync) setAutoSync(savedAutoSync === "on");
+    if (savedSyncHint) setSyncHint(savedSyncHint);
     if (saved) {
       const parsed = JSON.parse(saved) as {
         projects: Project[];
@@ -715,6 +719,10 @@ export default function Home() {
       setSyncHandle(handle);
       setSyncFileName(handle.name ?? null);
       setLastSyncAt(null);
+      if (handle.name) {
+        setSyncHint(handle.name);
+        localStorage.setItem(syncHintKey, handle.name);
+      }
     } catch (error) {
       if ((error as DOMException).name !== "AbortError") {
         pushNotice(t.syncFailed);
@@ -1076,6 +1084,14 @@ export default function Home() {
                 <span>
                   {t.lastSync}: {lastSyncLabel}
                 </span>
+                {!isSyncConnected && syncHint && (
+                  <button
+                    onClick={() => void connectSyncFile()}
+                    className="rounded-full border border-amber-400/40 px-2 py-1 text-[10px] text-amber-600 hover:bg-amber-500/10 dark:text-amber-200"
+                  >
+                    重新连接 ({syncHint})
+                  </button>
+                )}
               </div>
               {!isFsAvailable && (
                 <p className="text-[10px] text-amber-600 dark:text-amber-300">
