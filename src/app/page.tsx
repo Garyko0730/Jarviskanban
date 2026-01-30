@@ -33,9 +33,22 @@ const i18n = {
     exportData: "导出",
     importData: "导入",
     copySummary: "复制摘要",
+    syncBrief: "同步简报",
+    activityLog: "协作日志",
+    showActivity: "查看日志",
+    filters: "筛选",
+    search: "搜索",
+    clearFilters: "清除",
+    assigneeAll: "全部负责人",
+    priorityAll: "全部优先级",
+    dueAll: "全部时间",
+    overdue: "已逾期",
+    today: "今天",
+    week: "7天内",
     exportSuccess: "已导出看板数据",
     importFailed: "导入失败，请检查文件格式",
     copySuccess: "已复制到剪贴板",
+    syncCopied: "已复制同步简报",
     todo: "待办",
     inProgress: "进行中",
     review: "评审",
@@ -55,6 +68,19 @@ const i18n = {
     medium: "中",
     low: "低",
     empty: "暂无卡片",
+    stats: "健康度",
+    total: "总数",
+    doneCount: "完成",
+    overdueCount: "逾期",
+    activityEmpty: "暂无日志",
+    created: "新建卡片",
+    updated: "更新卡片",
+    moved: "移动卡片",
+    deleted: "删除卡片",
+    imported: "导入数据",
+    exported: "导出数据",
+    risks: "风险",
+    none: "暂无",
   },
   en: {
     appName: "Jarvis Kanban",
@@ -69,9 +95,22 @@ const i18n = {
     exportData: "Export",
     importData: "Import",
     copySummary: "Copy Summary",
+    syncBrief: "Sync Brief",
+    activityLog: "Activity",
+    showActivity: "View Log",
+    filters: "Filters",
+    search: "Search",
+    clearFilters: "Clear",
+    assigneeAll: "All assignees",
+    priorityAll: "All priorities",
+    dueAll: "All dates",
+    overdue: "Overdue",
+    today: "Today",
+    week: "Next 7 days",
     exportSuccess: "Board data exported",
     importFailed: "Import failed. Check the file format",
     copySuccess: "Copied to clipboard",
+    syncCopied: "Sync brief copied",
     todo: "To Do",
     inProgress: "In Progress",
     review: "Review",
@@ -91,6 +130,19 @@ const i18n = {
     medium: "Medium",
     low: "Low",
     empty: "No cards",
+    stats: "Health",
+    total: "Total",
+    doneCount: "Done",
+    overdueCount: "Overdue",
+    activityEmpty: "No activity yet",
+    created: "Created card",
+    updated: "Updated card",
+    moved: "Moved card",
+    deleted: "Deleted card",
+    imported: "Imported data",
+    exported: "Exported data",
+    risks: "Risks",
+    none: "None",
   },
 } as const;
 
@@ -125,6 +177,12 @@ type Project = {
   id: string;
   name: string;
   boards: Board[];
+};
+
+type Activity = {
+  id: string;
+  message: string;
+  createdAt: number;
 };
 
 const defaultBoard = (lang: Lang): Board => {
@@ -173,9 +231,23 @@ const defaultProject = (lang: Lang): Project => ({
 const storageKey = "jarvis-kanban-state";
 const themeKey = "jarvis-kanban-theme";
 const langKey = "jarvis-kanban-lang";
+const activityKey = "jarvis-kanban-activity";
 
 const getId = () =>
   globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random()}`;
+
+const parseDate = (value: string) => {
+  if (!value) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
+};
+
+const startOfToday = () => {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  return now;
+};
 
 type Draft = {
   id?: string;
@@ -186,6 +258,14 @@ type Draft = {
   priority: "low" | "medium" | "high";
   tags: string;
   dueDate: string;
+};
+
+type Filters = {
+  query: string;
+  assignee: "all" | string;
+  priority: "all" | Task["priority"];
+  tag: string;
+  due: "all" | "overdue" | "today" | "week";
 };
 
 function ColumnDroppable({
@@ -211,9 +291,13 @@ function ColumnDroppable({
 function TaskCard({
   task,
   onClick,
+  isOverdue,
+  overdueLabel,
 }: {
   task: Task;
   onClick: () => void;
+  isOverdue: boolean;
+  overdueLabel: string;
 }) {
   const {
     attributes,
@@ -244,18 +328,25 @@ function TaskCard({
       {...listeners}
       className={`cursor-grab rounded-xl border border-slate-200 bg-white p-3 text-sm text-black shadow-lg shadow-slate-200/60 transition active:cursor-grabbing dark:border-white/10 dark:bg-slate-900/60 dark:text-slate-100 dark:shadow-slate-950/30 ${
         isDragging ? "opacity-60" : "opacity-100"
-      }`}
+      } ${isOverdue ? "ring-1 ring-rose-400/70" : ""}`}
       onClick={onClick}
     >
       <div className="flex items-center justify-between gap-2">
         <h4 className="text-sm font-semibold text-black dark:text-slate-100">
           {task.title}
         </h4>
-        <span
-          className={`rounded-full border px-2 py-0.5 text-[10px] uppercase ${priorityColor}`}
-        >
-          {task.priority}
-        </span>
+        <div className="flex items-center gap-2">
+          {isOverdue && (
+            <span className="rounded-full border border-rose-400/60 bg-rose-500/10 px-2 py-0.5 text-[9px] uppercase text-rose-300">
+              {overdueLabel}
+            </span>
+          )}
+          <span
+            className={`rounded-full border px-2 py-0.5 text-[10px] uppercase ${priorityColor}`}
+          >
+            {task.priority}
+          </span>
+        </div>
       </div>
       <p className="mt-2 text-xs text-black line-clamp-2 dark:text-slate-300">
         {task.description}
@@ -308,6 +399,15 @@ export default function Home() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [filters, setFilters] = useState<Filters>({
+    query: "",
+    assignee: "all",
+    priority: "all",
+    tag: "",
+    due: "all",
+  });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const t = i18n[lang];
@@ -317,8 +417,16 @@ export default function Home() {
     const saved = localStorage.getItem(storageKey);
     const savedLang = localStorage.getItem(langKey) as Lang | null;
     const savedTheme = localStorage.getItem(themeKey) as "dark" | "light" | null;
+    const savedActivity = localStorage.getItem(activityKey);
     if (savedLang) setLang(savedLang);
     if (savedTheme) setTheme(savedTheme);
+    if (savedActivity) {
+      try {
+        setActivities(JSON.parse(savedActivity) as Activity[]);
+      } catch {
+        setActivities([]);
+      }
+    }
     if (saved) {
       const parsed = JSON.parse(saved) as {
         projects: Project[];
@@ -351,6 +459,10 @@ export default function Home() {
       JSON.stringify({ projects, activeProjectId, activeBoardId })
     );
   }, [projects, activeProjectId, activeBoardId]);
+
+  useEffect(() => {
+    localStorage.setItem(activityKey, JSON.stringify(activities));
+  }, [activities]);
 
   useEffect(() => {
     const project = projects.find((p) => p.id === activeProjectId) ?? projects[0];
@@ -395,6 +507,59 @@ export default function Home() {
     window.setTimeout(() => setNotice(null), 2200);
   };
 
+  const pushActivity = (message: string) => {
+    setActivities((prev) =>
+      [{ id: getId(), message, createdAt: Date.now() }, ...prev].slice(0, 80)
+    );
+  };
+
+  const isTaskOverdue = (task: Task) => {
+    if (!task.dueDate) return false;
+    const due = parseDate(task.dueDate);
+    if (!due) return false;
+    return due < startOfToday();
+  };
+
+  const isTaskDueToday = (task: Task) => {
+    if (!task.dueDate) return false;
+    const due = parseDate(task.dueDate);
+    if (!due) return false;
+    const today = startOfToday();
+    return due.getTime() === today.getTime();
+  };
+
+  const isTaskDueWeek = (task: Task) => {
+    if (!task.dueDate) return false;
+    const due = parseDate(task.dueDate);
+    if (!due) return false;
+    const today = startOfToday();
+    const end = new Date(today);
+    end.setDate(end.getDate() + 7);
+    return due >= today && due <= end;
+  };
+
+  const filterTask = (task: Task) => {
+    if (filters.query) {
+      const q = filters.query.toLowerCase();
+      const target = `${task.title} ${task.description} ${task.tags.join(" ")}`.toLowerCase();
+      if (!target.includes(q)) return false;
+    }
+    if (filters.assignee !== "all" && task.assignee !== filters.assignee) {
+      return false;
+    }
+    if (filters.priority !== "all" && task.priority !== filters.priority) {
+      return false;
+    }
+    if (filters.tag) {
+      const tagQ = filters.tag.toLowerCase();
+      if (!task.tags.some((tag) => tag.toLowerCase().includes(tagQ))) return false;
+    }
+    if (filters.due === "overdue" && !isTaskOverdue(task)) return false;
+    if (filters.due === "today" && !isTaskDueToday(task)) return false;
+    if (filters.due === "week" && !isTaskDueWeek(task)) return false;
+    return true;
+  };
+
   const exportData = () => {
     const payload = {
       exportedAt: new Date().toISOString(),
@@ -414,6 +579,7 @@ export default function Home() {
     link.click();
     URL.revokeObjectURL(url);
     pushNotice(t.exportSuccess);
+    pushActivity(t.exported);
   };
 
   const importData = async (file: File) => {
@@ -434,6 +600,7 @@ export default function Home() {
       if (parsed.activeBoardId) setActiveBoardId(parsed.activeBoardId);
       if (parsed.theme) setTheme(parsed.theme);
       if (parsed.lang) setLang(parsed.lang);
+      pushActivity(t.imported);
     } catch {
       pushNotice(t.importFailed);
     }
@@ -461,6 +628,46 @@ export default function Home() {
     try {
       await navigator.clipboard.writeText(text);
       pushNotice(t.copySuccess);
+    } catch {
+      window.alert(text);
+    }
+  };
+
+  const copySyncBrief = async () => {
+    const allTasks = Object.values(activeBoard.tasks);
+    const totalCount = allTasks.length;
+    const doneColumn = activeBoard.columns.find((col) => col.id === "col-done");
+    const doneCount = doneColumn?.taskIds.length ?? 0;
+    const overdueTasks = allTasks.filter(isTaskOverdue);
+    const risks = overdueTasks.map((task) => `- ${task.title} (${task.dueDate})`);
+
+    const lines = [
+      `# ${t.syncBrief} · ${activeProject.name} / ${activeBoard.name}`,
+      `- ${t.total}: ${totalCount} | ${t.doneCount}: ${doneCount} | ${t.overdueCount}: ${overdueTasks.length}`,
+      `- ${t.risks}: ${risks.length ? "\n" + risks.join("\n") : t.none}`,
+      "",
+      ...activeBoard.columns.map((column) => {
+        const tasks = column.taskIds
+          .map((id) => activeBoard.tasks[id])
+          .filter((task): task is Task => Boolean(task));
+        const taskLines =
+          tasks.length === 0
+            ? `- ${t.empty}`
+            : tasks
+                .map((task) => {
+                  const due = task.dueDate ? ` · ${task.dueDate}` : "";
+                  const who = task.assignee ? ` @${task.assignee}` : "";
+                  return `- ${task.title}${who}${due}`;
+                })
+                .join("\n");
+        return `## ${column.title}\n${taskLines}`;
+      }),
+    ];
+
+    const text = lines.join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      pushNotice(t.syncCopied);
     } catch {
       window.alert(text);
     }
@@ -506,6 +713,12 @@ export default function Home() {
 
       return { ...board, columns };
     });
+
+    const movedTask = activeBoard.tasks[activeId];
+    const targetTitle = targetColumn.title;
+    if (movedTask) {
+      pushActivity(`${t.moved}: ${movedTask.title} → ${targetTitle}`);
+    }
     setActiveTaskId(null);
   };
 
@@ -562,6 +775,13 @@ export default function Home() {
 
       return { ...board, tasks, columns };
     });
+
+    if (draft.id) {
+      pushActivity(`${t.updated}: ${draft.title}`);
+    } else {
+      pushActivity(`${t.created}: ${draft.title}`);
+    }
+
     setDraft(null);
   };
 
@@ -576,6 +796,7 @@ export default function Home() {
       }));
       return { ...board, tasks, columns };
     });
+    pushActivity(`${t.deleted}: ${draft.title}`);
     setDraft(null);
   };
 
@@ -604,6 +825,12 @@ export default function Home() {
     );
     setActiveBoardId(newBoard.id);
   };
+
+  const allTasks = Object.values(activeBoard.tasks);
+  const totalCount = allTasks.length;
+  const doneColumn = activeBoard.columns.find((col) => col.id === "col-done");
+  const doneCount = doneColumn?.taskIds.length ?? 0;
+  const overdueCount = allTasks.filter(isTaskOverdue).length;
 
   return (
     <div
@@ -638,6 +865,11 @@ export default function Home() {
             {notice && (
               <p className="mt-2 text-xs text-emerald-500">{notice}</p>
             )}
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-[10px] text-slate-500 dark:text-slate-300">
+              <div className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1">
+                {t.stats}: {t.total} {totalCount} · {t.doneCount} {doneCount} · {t.overdueCount} {overdueCount}
+              </div>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2 rounded-full bg-white/70 px-3 py-2 text-xs dark:bg-white/5">
@@ -699,6 +931,12 @@ export default function Home() {
               >
                 {t.copySummary}
               </button>
+              <button
+                onClick={copySyncBrief}
+                className="rounded-full border border-amber-400/40 px-3 py-1 text-[10px] text-amber-600 hover:bg-amber-500/10 dark:text-amber-200"
+              >
+                {t.syncBrief}
+              </button>
             </div>
             <div className="flex items-center gap-2 rounded-full bg-white/70 px-3 py-2 text-xs dark:bg-white/5">
               <span className="text-black dark:text-slate-300">{t.language}</span>
@@ -718,7 +956,95 @@ export default function Home() {
                 {theme === "dark" ? t.dark : t.light}
               </button>
             </div>
+            <div className="flex items-center gap-2 rounded-full bg-white/70 px-3 py-2 text-xs dark:bg-white/5">
+              <button
+                onClick={() => setActivityOpen(true)}
+                className="rounded-full border border-fuchsia-400/40 px-3 py-1 text-[10px] text-fuchsia-600 hover:bg-fuchsia-500/10 dark:text-fuchsia-200"
+              >
+                {t.showActivity}
+              </button>
+            </div>
           </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-white/70 px-4 py-3 text-xs text-black dark:bg-white/5 dark:text-slate-200">
+          <span className="text-[10px] uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
+            {t.filters}
+          </span>
+          <input
+            className="rounded-full border border-slate-200/60 bg-white px-3 py-1 text-xs text-black dark:border-white/10 dark:bg-slate-900/60 dark:text-slate-100"
+            placeholder={t.search}
+            value={filters.query}
+            onChange={(event) =>
+              setFilters((prev) => ({ ...prev, query: event.target.value }))
+            }
+          />
+          <input
+            className="rounded-full border border-slate-200/60 bg-white px-3 py-1 text-xs text-black dark:border-white/10 dark:bg-slate-900/60 dark:text-slate-100"
+            placeholder={t.tags}
+            value={filters.tag}
+            onChange={(event) =>
+              setFilters((prev) => ({ ...prev, tag: event.target.value }))
+            }
+          />
+          <select
+            className="rounded-full border border-slate-200/60 bg-white px-3 py-1 text-xs text-black dark:border-white/10 dark:bg-slate-900/60 dark:text-slate-100"
+            value={filters.assignee}
+            onChange={(event) =>
+              setFilters((prev) => ({ ...prev, assignee: event.target.value }))
+            }
+          >
+            <option value="all">{t.assigneeAll}</option>
+            {assignees.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+          <select
+            className="rounded-full border border-slate-200/60 bg-white px-3 py-1 text-xs text-black dark:border-white/10 dark:bg-slate-900/60 dark:text-slate-100"
+            value={filters.priority}
+            onChange={(event) =>
+              setFilters((prev) => ({
+                ...prev,
+                priority: event.target.value as Filters["priority"],
+              }))
+            }
+          >
+            <option value="all">{t.priorityAll}</option>
+            <option value="high">{t.high}</option>
+            <option value="medium">{t.medium}</option>
+            <option value="low">{t.low}</option>
+          </select>
+          <select
+            className="rounded-full border border-slate-200/60 bg-white px-3 py-1 text-xs text-black dark:border-white/10 dark:bg-slate-900/60 dark:text-slate-100"
+            value={filters.due}
+            onChange={(event) =>
+              setFilters((prev) => ({
+                ...prev,
+                due: event.target.value as Filters["due"],
+              }))
+            }
+          >
+            <option value="all">{t.dueAll}</option>
+            <option value="overdue">{t.overdue}</option>
+            <option value="today">{t.today}</option>
+            <option value="week">{t.week}</option>
+          </select>
+          <button
+            onClick={() =>
+              setFilters({
+                query: "",
+                assignee: "all",
+                priority: "all",
+                tag: "",
+                due: "all",
+              })
+            }
+            className="rounded-full border border-slate-200/60 px-3 py-1 text-[10px] text-slate-600 hover:bg-slate-200/40 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/10"
+          >
+            {t.clearFilters}
+          </button>
         </div>
       </header>
 
@@ -734,7 +1060,8 @@ export default function Home() {
             {activeBoard.columns.map((column) => {
               const tasks = column.taskIds
                 .map((id) => activeBoard.tasks[id])
-                .filter((task): task is Task => Boolean(task));
+                .filter((task): task is Task => Boolean(task))
+                .filter(filterTask);
               return (
                 <div
                   key={column.id}
@@ -771,6 +1098,8 @@ export default function Home() {
                         <TaskCard
                           key={task.id}
                           task={task}
+                          isOverdue={isTaskOverdue(task)}
+                          overdueLabel={t.overdue}
                           onClick={() => openDraft(column.id, task)}
                         />
                       ))}
@@ -909,6 +1238,45 @@ export default function Home() {
                   {t.save}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activityOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="w-full max-w-xl rounded-3xl border border-white/10 bg-slate-950/90 p-6 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-slate-100">
+                {t.activityLog}
+              </h3>
+              <button
+                onClick={() => setActivityOpen(false)}
+                className="text-xs text-slate-400 hover:text-slate-200"
+              >
+                {t.cancel}
+              </button>
+            </div>
+            <div className="mt-4 max-h-[360px] space-y-2 overflow-auto text-xs">
+              {activities.length === 0 ? (
+                <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-6 text-center text-slate-400">
+                  {t.activityEmpty}
+                </div>
+              ) : (
+                activities.map((item) => (
+                  <div
+                    key={item.id}
+                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-slate-200"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span>{item.message}</span>
+                      <span className="text-[10px] text-slate-400">
+                        {new Date(item.createdAt).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
