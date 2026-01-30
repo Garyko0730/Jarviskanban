@@ -39,6 +39,9 @@ yarn-error.log*
 # sync agent
 .sync/
 
+# electron
+/dist
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
