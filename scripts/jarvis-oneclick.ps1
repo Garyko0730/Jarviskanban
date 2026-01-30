@@ -3,6 +3,18 @@ Add-Type -AssemblyName System.Windows.Forms
 $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $projectRoot
 
+$intro = @"
+Jarvis Kanban · One-Click Launch
+
+- 选择你的同步 JSON 文件
+- 后台自动启动看板与同步代理
+- 浏览器会自动打开
+
+提示：工作时保持该窗口开启
+"@
+
+[System.Windows.Forms.MessageBox]::Show($intro, "Jarvis Kanban") | Out-Null
+
 $dialog = New-Object System.Windows.Forms.OpenFileDialog
 $dialog.Title = "Select Jarvis Kanban sync file"
 $dialog.Filter = "JSON Files (*.json)|*.json|All Files (*.*)|*.*"
