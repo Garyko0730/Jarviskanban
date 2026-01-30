@@ -54,7 +54,7 @@ const startSyncAgent = (syncFile) => {
   if (!syncFile) return;
   if (syncAgent) syncAgent.kill();
   const scriptPath = getUnpackedPath("scripts/sync-agent.js");
-  syncAgent = spawn(process.execPath, [scriptPath, "--file", syncFile], {
+  syncAgent = spawn(process.execPath, ["--run-as-node", scriptPath, "--file", syncFile], {
     stdio: "ignore",
     cwd: getAppRoot(),
   });
@@ -111,7 +111,7 @@ const startNextServer = async () => {
   if (nextProcess) return;
   currentPort = await findFreePort();
   const nextBin = getUnpackedPath("node_modules/next/dist/bin/next");
-  nextProcess = spawn(process.execPath, [nextBin, "start", "-p", String(currentPort)], {
+  nextProcess = spawn(process.execPath, ["--run-as-node", nextBin, "start", "-p", String(currentPort)], {
     stdio: "ignore",
     cwd: getAppRoot(),
   });
