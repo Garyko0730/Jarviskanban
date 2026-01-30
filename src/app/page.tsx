@@ -61,6 +61,9 @@ const i18n = {
     conversation: "对话",
     assistantReply: "Jarvis 回复",
     readTag: "已读",
+    clearAll: "清空",
+    collapse: "折叠",
+    expand: "展开",
     exportSuccess: "已导出看板数据",
     importFailed: "导入失败，请检查文件格式",
     copySuccess: "已复制到剪贴板",
@@ -125,6 +128,9 @@ const i18n = {
     conversation: "Conversation",
     assistantReply: "Jarvis Reply",
     readTag: "Read",
+    clearAll: "Clear",
+    collapse: "Collapse",
+    expand: "Expand",
     exportSuccess: "Board data exported",
     importFailed: "Import failed. Check the file format",
     copySuccess: "Copied to clipboard",
@@ -413,6 +419,7 @@ export default function Home() {
   const [syncSupported, setSyncSupported] = useState(false);
   const [autoSync, setAutoSync] = useState(true);
   const [syncHint, setSyncHint] = useState<string | null>(null);
+  const [conversationOpen, setConversationOpen] = useState(true);
   const syncTimerRef = useRef<number | null>(null);
   const syncReadRef = useRef<number | null>(null);
 
@@ -1176,31 +1183,51 @@ export default function Home() {
       {activeBoard.messages && activeBoard.messages.length > 0 && (
         <section className="mt-6 rounded-3xl border border-slate-200 bg-white/70 p-4 text-xs text-black shadow-lg dark:border-white/10 dark:bg-slate-950/50 dark:text-slate-100">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold">{t.conversation}</h3>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400">
-              {activeBoard.messages.length}
-            </span>
-          </div>
-          <div className="mt-3 space-y-2">
-            {activeBoard.messages.map((msg) => (
-              <div
-                key={msg.id}
-                className="rounded-2xl border border-white/10 bg-white/60 px-3 py-2 text-xs dark:bg-white/5"
+            <div className="flex items-center gap-3">
+              <h3 className="text-sm font-semibold">{t.conversation}</h3>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                {activeBoard.messages.length}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setConversationOpen((prev) => !prev)}
+                className="rounded-full border border-slate-300/40 px-2 py-1 text-[10px] text-slate-600 hover:bg-slate-200/40 dark:text-slate-300"
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-cyan-600 dark:text-cyan-300">
-                    {msg.role === "assistant" ? t.assistantReply : "System"}
-                  </span>
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                    {new Date(msg.createdAt).toLocaleString(
-                      lang === "zh" ? "zh-CN" : "en-US"
-                    )}
-                  </span>
-                </div>
-                <p className="mt-2 text-[12px] leading-relaxed">{msg.content}</p>
-              </div>
-            ))}
+                {conversationOpen ? t.collapse : t.expand}
+              </button>
+              <button
+                onClick={() =>
+                  updateBoard((board) => ({ ...board, messages: [] }))
+                }
+                className="rounded-full border border-rose-400/40 px-2 py-1 text-[10px] text-rose-600 hover:bg-rose-500/10 dark:text-rose-200"
+              >
+                {t.clearAll}
+              </button>
+            </div>
           </div>
+          {conversationOpen && (
+            <div className="mt-3 space-y-2">
+              {activeBoard.messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className="rounded-2xl border border-white/10 bg-white/60 px-3 py-2 text-xs dark:bg-white/5"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-cyan-600 dark:text-cyan-300">
+                      {msg.role === "assistant" ? t.assistantReply : "System"}
+                    </span>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                      {new Date(msg.createdAt).toLocaleString(
+                        lang === "zh" ? "zh-CN" : "en-US"
+                      )}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-[12px] leading-relaxed">{msg.content}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       )}
 
