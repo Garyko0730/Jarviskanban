@@ -13,6 +13,7 @@ Jarvis Kanban · One-Click Launch
 提示：工作时保持该窗口开启
 "@
 
+Write-Host $intro
 [System.Windows.Forms.MessageBox]::Show($intro, "Jarvis Kanban") | Out-Null
 
 $dialog = New-Object System.Windows.Forms.OpenFileDialog
